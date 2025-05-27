@@ -1,0 +1,11 @@
+{
+  "name": "photoraw",
+  "version": "0.1.0",
+  "dependencies": [
+    "fmt",
+    "libraw",
+    "glfw3",
+    "nativefiledialog-extended",
+    "opencv4"
+  ]
+}

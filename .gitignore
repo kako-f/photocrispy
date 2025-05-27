@@ -1,6 +1,3 @@
-# Created by https://www.toptal.com/developers/gitignore/api/c++,cmake,vcpkg,windows
-# Edit at https://www.toptal.com/developers/gitignore?templates=c++,cmake,vcpkg,windows
-
 ### C++ ###
 # Prerequisites
 *.d
@@ -34,6 +31,9 @@
 *.exe
 *.out
 *.app
+
+# Build Folder
+build/
 
 ### CMake ###
 CMakeLists.txt.user
@@ -88,4 +88,3 @@ $RECYCLE.BIN/
 # Windows shortcuts
 *.lnk
 
-# End of https://www.toptal.com/developers/gitignore/api/c++,cmake,vcpkg,windows
