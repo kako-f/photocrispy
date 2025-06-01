@@ -73,7 +73,7 @@ int main(int, char **)
 #endif
 
     // Create window with graphics context
-    GLFWwindow *window = glfwCreateWindow(1280, 720, "PhotoCrispy", nullptr, nullptr);
+    GLFWwindow *window = glfwCreateWindow(1920, 1080, "PhotoCrispy", nullptr, nullptr);
     if (window == nullptr)
         return 1;
     glfwMakeContextCurrent(window);

@@ -31,7 +31,14 @@ target_include_directories(ImGui PUBLIC
     ${IMGUI_PATH}/backends
 )
 
-add_executable(photoraw src/main_app.cpp main.cpp src/raw_processing.cpp src/gl_photo_texture.cpp)
+add_executable(photoraw 
+        src/main_app.cpp 
+        main.cpp 
+        src/raw_processing.cpp 
+        src/gl_photo_texture.cpp 
+        src/imageviewer.cpp
+        src/threaded_load.cpp
+        )
 
 target_link_libraries(photoraw
     PRIVATE

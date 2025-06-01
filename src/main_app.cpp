@@ -6,6 +6,7 @@
 #include <fmt/core.h>
 #include <GLFW/glfw3.h>
 #include <algorithm>
+#include "imageviewer.h"
 
 namespace PhotoRaw
 {
@@ -14,9 +15,9 @@ namespace PhotoRaw
     void RenderDockSpace();
     void RenderMenuBar();
 
-    void RenderLeftInfoPanel();
+    void RenderLeftInfoPanel(ImageProcessor::ImageViewer &imageViewport);
 
-    void RenderImageViewPanel();
+    void RenderImageViewPanel(ImageProcessor::ImageViewer &imageViewport);
     void RenderImagePreviewPanel();
     void RenderRightInfoPanel();
 
@@ -24,23 +25,23 @@ namespace PhotoRaw
 
     static std::string selectedFilePath;
     static bool shouldUpdateTexture = false;
-    static gl_photo_texture photoRawTexture;
-    static float imageZoom = 1.0f;
 
-    RawProcessor::RawImageInfo info;
+    RawProcessor::RawImageInfo rawInfo;
 
     void RenderUI()
     {
+        static ImageProcessor::ImageViewer imageViewport;
+
         RenderDockSpace();
 
         // Main menu bar
         RenderMenuBar();
 
         // left Info UI panel
-        RenderLeftInfoPanel();
+        RenderLeftInfoPanel(imageViewport);
 
         // View Image Panel
-        RenderImageViewPanel();
+        RenderImageViewPanel(imageViewport);
 
         // Image strip
         RenderImagePreviewPanel();
@@ -49,7 +50,7 @@ namespace PhotoRaw
         RenderRightInfoPanel();
 
         // ImGui::ShowDemoWindow();
-        ImGui::ShowMetricsWindow();
+        // ImGui::ShowMetricsWindow();
     }
 
     void RenderDockSpace()
@@ -83,7 +84,7 @@ namespace PhotoRaw
                         selectedFilePath = outPath.get();
                         std::string out_message = fmt::format("Success!! {}\n", outPath.get());
                         fmt::print("{}", out_message);
-                        info = RawProcessor::loadRaw(selectedFilePath);
+                        rawInfo = RawProcessor::loadRaw(selectedFilePath);
                         shouldUpdateTexture = true;
                     }
                     else if (result == NFD_CANCEL)
@@ -114,89 +115,54 @@ namespace PhotoRaw
         }
         //
     }
-    // Information of the current image is shown when this is loaded.
-    void RenderLeftInfoPanel()
+    // Information of the current image is shown when its loaded.
+    // An instance of ImageViewer is passed to access the associated 
+    // methods of zoom and reset (and others...)
+    void RenderLeftInfoPanel(ImageProcessor::ImageViewer &imageViewport)
     {
-
-        ImGui::Begin("File Info");
-        if (info.success)
+        ImGui::Begin("Image Info");
+        if (rawInfo.success)
         {
+  
             std::string message = fmt::format("Opened file path: {}", selectedFilePath);
             ImGui::TextWrapped("%s", message.c_str());
-            ImGui::Text("Image Size: %d x %d", info.width, info.height);
-            ImGui::Text("Camera make: %s", info.cam_make.c_str());
-            ImGui::Text("Camera model: %s", info.cam_model.c_str());
-            
-            // from 10% to 500%
-            ImGui::SliderFloat("Zoom", &imageZoom, 0.1f, 5.0f, "%.1fx");
-            // Reset zoom. 
-            if (ImGui::Button("Reset"))
+            ImGui::TextWrapped("Image Size: %d x %d", rawInfo.width, rawInfo.height);
+            ImGui::TextWrapped("Camera make: %s", rawInfo.cam_make.c_str());
+            ImGui::TextWrapped("Camera model: %s", rawInfo.cam_model.c_str());
+            ImGui::Separator();
+            // from 10% to 1000%
+            float zoom = imageViewport.getZoom() * 100;
+            if (ImGui::SliderFloat("Zoom", &zoom, 10.0f, 1000.0f, "%.0f%%"))
             {
-                imageZoom = 1.0f;
+                imageViewport.setZoom(zoom/ 100.0f); // update class value if slider changed
+            }
+
+            //ImGui::SliderFloat("Zoom", &zoom, 10.0f, 1000.0f, "%.0f%%");
+
+
+            ImGui::Text("Zoom Level: %.0f%%", imageViewport.getZoom() * 100.0f);
+
+            if (ImGui::Button("Reset View"))
+            {
+                imageViewport.resetView();
             }
         }
 
         ImGui::End();
     }
-
-    void RenderImageViewPanel()
+    // An instance of ImageViewer is passed to render the image in the viewport
+    // using gl_photo_texture for the moment
+    // DX or Vulkan (or both) in the future.
+    void RenderImageViewPanel(ImageProcessor::ImageViewer &imageViewport)
     {
-        ImGui::Begin("viewport");
 
-        if (info.success && shouldUpdateTexture)
+        imageViewport.render();
+
+        if (rawInfo.success && shouldUpdateTexture)
         {
-            photoRawTexture = gl_photo_texture();
-            photoRawTexture.create_texture(info.width, info.height, info.colors, info.data.data());
+            imageViewport.loadImage(rawInfo);
             shouldUpdateTexture = false;
         }
-        if (photoRawTexture.getID())
-        {
-            // Size of the current panel and position (coordinates) of the currentWindow
-            ImVec2 avail = ImGui::GetContentRegionAvail();
-            ImVec2 winCoords = ImGui::GetCursorPos();
-
-            // Calculate aspect-ratio-preserving draw size
-            // draw Height/Width are floats that are modified accordingly
-            float imageAspect = static_cast<float>(info.width) / static_cast<float>(info.height);
-            float panelAspect = avail.x / avail.y;
-            float drawWidth, drawHeight;
-
-            if (panelAspect > imageAspect)
-            {
-                // Panel is wider — fit by height
-                drawHeight = avail.y;
-                drawWidth = drawHeight * imageAspect;
-            }
-            else
-            {
-                // Panel is narrower — fit by width
-                drawWidth = avail.x;
-                drawHeight = drawWidth / imageAspect;
-            }
-            // TODO
-            // if Shift is hold, change to 10% zoom step
-            float scroll = ImGui::GetIO().MouseWheel;
-            if (ImGui::IsWindowHovered() && scroll != 0.0f)
-            {
-                float zoomFactor = 1.01f; // 1% zoom per step
-                if (scroll > 0)
-                    imageZoom *= zoomFactor;
-                else
-                    imageZoom /= zoomFactor;
-
-                imageZoom = std::clamp(imageZoom, 0.1f, 5.0f);
-            }
-
-            // Centering the image in the viewport
-            ImVec2 centerOffset = {
-                std::max(0.0f, (avail.x - drawWidth * imageZoom) * 0.5f),
-                std::max(0.0f, (avail.y - drawHeight * imageZoom) * 0.5f)};
-            ImGui::SetCursorPos(ImVec2(winCoords.x + centerOffset.x, winCoords.y + centerOffset.y));
-
-            // Render scaled image / apply zoom
-            ImGui::Image((ImTextureID)(intptr_t)photoRawTexture.getID(), ImVec2(drawWidth * imageZoom, drawHeight * imageZoom));
-        }
-        ImGui::End();
     }
 
     void RenderImagePreviewPanel()

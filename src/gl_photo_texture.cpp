@@ -9,12 +9,14 @@ gl_photo_texture::~gl_photo_texture()
 {
     glDeleteTextures(1, &textureID);
 }
+
 // Move Constructor
 gl_photo_texture::gl_photo_texture(gl_photo_texture &&other) noexcept
 {
     textureID = other.textureID; // Take ownership of other's texture
     other.textureID = 0;         // Leave other in a safe state (no deletion in its destructor)
 }
+
 // Move Assignment operator
 gl_photo_texture &gl_photo_texture::operator=(gl_photo_texture &&other) noexcept
 {
@@ -42,8 +44,11 @@ bool gl_photo_texture::create_texture(int width, int height, int channels, const
     else if (channels == 4) format = GL_RGBA;
 
     // Setup filtering parameters for display
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    // GL_NEAREST / More pixelated "zoomed" image. 
+    // GL_LINEAR / smoothed max zoom, less pixels
+    
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
     // Upload pixels into texture
     // --
