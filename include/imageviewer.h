@@ -2,6 +2,7 @@
 
 #include "gl_photo_texture.h"
 #include "raw_processing.h"
+#include "threaded_load.h"
 #include "imgui.h"
 
 namespace ImageProcessor
@@ -32,7 +33,7 @@ namespace ImageProcessor
             panningOffset = ImVec2(0.0f, 0.0f);
         }
         void loadImage(const RawProcessor::RawImageInfo &imageInfo);
-        void render();
+        void render(const ThreadLoader::ThreadedImageLoader &imageLoader);
     };
 
 }

@@ -1,12 +1,13 @@
 #include "main_app.h"
 #include "raw_processing.h"
 #include "gl_photo_texture.h"
+#include "imageviewer.h"
+#include "threaded_load.h"
 #include "imgui.h"
 #include "nfd.hpp"
 #include <fmt/core.h>
 #include <GLFW/glfw3.h>
 #include <algorithm>
-#include "imageviewer.h"
 
 namespace PhotoRaw
 {
@@ -21,12 +22,13 @@ namespace PhotoRaw
     void RenderImagePreviewPanel();
     void RenderRightInfoPanel();
 
-    GLuint createTextureFromImage(const RawProcessor::RawImageInfo &img);
 
     static std::string selectedFilePath;
     static bool shouldUpdateTexture = false;
 
+    // instance of RawProcessor to pass to threaded Loader
     RawProcessor::RawImageInfo rawInfo;
+    ThreadLoader::ThreadedImageLoader imageLoader;
 
     void RenderUI()
     {
@@ -84,8 +86,8 @@ namespace PhotoRaw
                         selectedFilePath = outPath.get();
                         std::string out_message = fmt::format("Success!! {}\n", outPath.get());
                         fmt::print("{}", out_message);
-                        rawInfo = RawProcessor::loadRaw(selectedFilePath);
-                        shouldUpdateTexture = true;
+                        // rawInfo = RawProcessor::loadRaw(selectedFilePath);
+                        imageLoader.startAsyncLoad(selectedFilePath);
                     }
                     else if (result == NFD_CANCEL)
                     {
@@ -113,17 +115,21 @@ namespace PhotoRaw
 
             ImGui::EndMainMenuBar();
         }
-        //
+        if (imageLoader.pollLoadResult(rawInfo))
+        {
+            shouldUpdateTexture = true;
+        }
+
     }
     // Information of the current image is shown when its loaded.
-    // An instance of ImageViewer is passed to access the associated 
+    // An instance of ImageViewer is passed to access the associated
     // methods of zoom and reset (and others...)
     void RenderLeftInfoPanel(ImageProcessor::ImageViewer &imageViewport)
     {
         ImGui::Begin("Image Info");
         if (rawInfo.success)
         {
-  
+
             std::string message = fmt::format("Opened file path: {}", selectedFilePath);
             ImGui::TextWrapped("%s", message.c_str());
             ImGui::TextWrapped("Image Size: %d x %d", rawInfo.width, rawInfo.height);
@@ -134,11 +140,10 @@ namespace PhotoRaw
             float zoom = imageViewport.getZoom() * 100;
             if (ImGui::SliderFloat("Zoom", &zoom, 10.0f, 1000.0f, "%.0f%%"))
             {
-                imageViewport.setZoom(zoom/ 100.0f); // update class value if slider changed
+                imageViewport.setZoom(zoom / 100.0f); // update class value if slider changed
             }
 
-            //ImGui::SliderFloat("Zoom", &zoom, 10.0f, 1000.0f, "%.0f%%");
-
+            // ImGui::SliderFloat("Zoom", &zoom, 10.0f, 1000.0f, "%.0f%%");
 
             ImGui::Text("Zoom Level: %.0f%%", imageViewport.getZoom() * 100.0f);
 
@@ -156,7 +161,7 @@ namespace PhotoRaw
     void RenderImageViewPanel(ImageProcessor::ImageViewer &imageViewport)
     {
 
-        imageViewport.render();
+        imageViewport.render(imageLoader); 
 
         if (rawInfo.success && shouldUpdateTexture)
         {

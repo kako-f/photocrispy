@@ -1,6 +1,8 @@
 #include "imageviewer.h"
+#include "threaded_load.h"
 #include <algorithm>
 #include <iostream>
+
 namespace ImageProcessor
 {
 
@@ -19,21 +21,26 @@ namespace ImageProcessor
         hasTexture = true;
     }
 
-    void ImageViewer::render()
+    void ImageViewer::render(const ThreadLoader::ThreadedImageLoader &imageLoader)
     {
         // No scrollbar to viewport.
         // TODO
         // Probably need to pass it as an option
-        ImGuiWindowFlags windowsFlags  = 0; 
+        ImGuiWindowFlags windowsFlags = 0;
         windowsFlags |= ImGuiWindowFlags_NoScrollbar;
 
         ImGui::Begin("viewport", nullptr, windowsFlags);
 
-        if (!hasTexture)
+
+        if (!hasTexture && !imageLoader.isLoading())
         {
             ImGui::Text("No image loaded.");
             ImGui::End();
             return;
+        }
+        else if (imageLoader.isLoading())
+        {
+            ImGui::Text("Loading %c", "|/-\\"[(int)(ImGui::GetTime() / 0.05f) & 3]);
         }
 
         // Size of the current panel and position (coordinates) of the currentWindow
@@ -66,6 +73,8 @@ namespace ImageProcessor
         drawHeight *= imageZoom;
 
         // Set centered position of the image in the viewport
+        // Remember that graphic data is rendered from the point (0, 0)
+        // that is typically the top-left corner of the drawing surface (viewport).
         ImVec2 centeredPos = {
             cursorPos.x + (avail.x - drawWidth) * 0.5f + panningOffset.x,
             cursorPos.y + (avail.y - drawHeight) * 0.5f + panningOffset.y};
@@ -113,24 +122,25 @@ namespace ImageProcessor
             // 1% zoom per step or 10% with shit
             float zoomFactor = io.KeyShift ? 1.1f : 1.01f;
             float previousZoom = imageZoom;
-            
-            // Scroll wheel movement. 
+
+            // Scroll wheel movement.
             if (scroll > 0)
                 imageZoom *= zoomFactor;
             else
                 imageZoom /= zoomFactor;
             // Safe Margins 10% / 1000%
             imageZoom = std::clamp(imageZoom, 0.1f, 10.0f);
-            
+
             // Capturing mouse position
             ImVec2 mousePos = io.MousePos;
 
             // Calculate relative position of mouse to image
-            // imagePos is a vector of the image (centered) in the viewport.
+            // imagePos is a vector of the image  in the viewport.
+            // Top left corner is (0.0), from where the image is loaded
             ImVec2 mouseToImage = {
                 mousePos.x - imagePos.x,
                 mousePos.y - imagePos.y};
-                
+
             // Normalized mouse offset in image (0 to 1)
             // relative coordinates ie middle of the image will be (.5,.5)
             ImVec2 mouseRatio = {
@@ -145,29 +155,24 @@ namespace ImageProcessor
             // New image position after zoom
             ImVec2 newImagePos = {
                 imagePos.x + (imageSize.x - newWidth) * 0.5f,
-                imagePos.y + (imageSize.y - newHeight) * 0.5f
-            };           
+                imagePos.y + (imageSize.y - newHeight) * 0.5f};
 
             // New Target position of the same point under the mouse in the new image
             ImVec2 newMouseToImage = {
                 mouseRatio.x * newWidth,
-                mouseRatio.y * newHeight
-            };
+                mouseRatio.y * newHeight};
             // this is where the point under the cursor ends up after zooming, without any compensation
             ImVec2 newMouseImagePos = {
                 newImagePos.x + newMouseToImage.x,
-                newImagePos.y + newMouseToImage.y
-            };
+                newImagePos.y + newMouseToImage.y};
 
             // This adjustment pushes the image back so that the same image pixel remains under the cursor after the zoom.
             ImVec2 offsetChange = {
                 mousePos.x - newMouseImagePos.x,
-                mousePos.y - newMouseImagePos.y
-            };
-
+                mousePos.y - newMouseImagePos.y};
+            // Passing the new panning values to the outside variables
             panningOffset.x += offsetChange.x;
-            panningOffset.y += offsetChange.y;            
-
+            panningOffset.y += offsetChange.y;
         }
     }
     // Get zoom value
