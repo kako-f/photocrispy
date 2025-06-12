@@ -2,7 +2,6 @@
 #include <string>
 #include <vector>
 
-
 namespace RawProcessor
 {
     struct RawImageInfo
@@ -16,9 +15,12 @@ namespace RawProcessor
         std::string cam_make;
         std::string cam_model;
 
-        std::vector<unsigned char> data; 
-
+        std::vector<unsigned char> data;
+        unsigned char *jpgdata;
+        bool is_jpeg_encoded = false;
+        bool is_raw_encoded = false;
     };
 
     RawImageInfo loadRaw(const std::string &raw_image_filepath);
+    RawImageInfo loadJpgPreview(const std::string &raw_image_filepath);
 }

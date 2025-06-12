@@ -2,6 +2,7 @@
 #include "threaded_load.h"
 #include <algorithm>
 #include <iostream>
+#include "stb_image.h"
 
 namespace ImageProcessor
 {
@@ -9,11 +10,22 @@ namespace ImageProcessor
     void ImageViewer::loadImage(const RawProcessor::RawImageInfo &imageInfo)
     {
         imageTexture = gl_photo_texture();
-        imageTexture.create_texture(imageInfo.width, imageInfo.height, imageInfo.colors, imageInfo.data.data());
+        // is JPG or RAW ?
+        // JPG (or others) is regarding thumbnails and thumbnail generation.
+        if (imageInfo.is_raw_encoded)
+        {
+            imageTexture.create_texture(imageInfo.width, imageInfo.height, imageInfo.colors, imageInfo.data.data());
+        }
+        else if (imageInfo.is_jpeg_encoded)
+        {
+            imageTexture.create_texture(imageInfo.width, imageInfo.height, imageInfo.colors, imageInfo.jpgdata);
+            stbi_image_free(imageInfo.jpgdata);
+        }else{}
 
         imageWidth = imageInfo.width;
         imageHeight = imageInfo.height;
         imageColors = imageInfo.colors;
+        imageBits = imageInfo.bits;
 
         imageZoom = 1.0f;
         panningOffset = ImVec2(0, 0);
@@ -30,7 +42,6 @@ namespace ImageProcessor
         windowsFlags |= ImGuiWindowFlags_NoScrollbar;
 
         ImGui::Begin("viewport", nullptr, windowsFlags);
-
 
         if (!hasTexture && !imageLoader.isLoading())
         {

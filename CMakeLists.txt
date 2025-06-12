@@ -32,12 +32,14 @@ target_include_directories(ImGui PUBLIC
 )
 
 add_executable(photoraw 
-        src/main_app.cpp 
+        src/photocrispy.cpp 
         main.cpp 
         src/raw_processing.cpp 
         src/gl_photo_texture.cpp 
         src/imageviewer.cpp
         src/threaded_load.cpp
+        src/content_browser.cpp
+        src/imageutils.cpp
         )
 
 target_link_libraries(photoraw

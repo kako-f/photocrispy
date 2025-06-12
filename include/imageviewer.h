@@ -17,6 +17,7 @@ namespace ImageProcessor
         int imageWidth = 0;
         int imageHeight = 0;
         int imageColors = 0;
+        int imageBits = 0;
 
         bool hasTexture = false;
 
@@ -24,7 +25,7 @@ namespace ImageProcessor
 
     public:
         float getZoom() const { return imageZoom; }
-        void setZoom(float newZoom);    
+        void setZoom(float newZoom);
         float *getZoomPointer();
 
         void resetView()

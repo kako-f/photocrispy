@@ -64,6 +64,7 @@ bool gl_photo_texture::create_texture(int width, int height, int channels, const
         GL_UNSIGNED_BYTE,
         data
     );
+    
     // helper function to glBindTexture
     unbind();
     

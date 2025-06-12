@@ -1,13 +1,16 @@
 #pragma once
+#include <filesystem>
 
 namespace ContentBrowser
 {
     class RawBrowser
     {
     private:
-        /* data */
+        std::filesystem::path baseDirectory;
+        std::filesystem::path currentDirectory;
+
     public:
-        // RawBrowser(/* args */);
+        RawBrowser();
         //  destructor
         //~RawBrowser();
         void browseImages();
