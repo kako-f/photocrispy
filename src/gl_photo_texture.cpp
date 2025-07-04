@@ -1,5 +1,4 @@
 #include "gl_photo_texture.h"
-#include <GLFW/glfw3.h>
 
 gl_photo_texture::gl_photo_texture()
 {
@@ -34,48 +33,43 @@ gl_photo_texture &gl_photo_texture::operator=(gl_photo_texture &&other) noexcept
 
 bool gl_photo_texture::create_texture(int width, int height, int channels, const unsigned char *data)
 {
-    if (!textureID) return false;
+    if (!textureID)
+        return false;
     // helper function to glBindTexture
     bind();
 
     GLenum format = GL_RGB;
-    if (channels == 1) format = GL_RED;
-    else if (channels == 3) format = GL_RGB;
-    else if (channels == 4) format = GL_RGBA;
+    if (channels == 1)
+        format = GL_RED;
+    else if (channels == 3)
+        format = GL_RGB;
+    else if (channels == 4)
+        format = GL_RGBA;
 
     // Setup filtering parameters for display
-    // GL_NEAREST / More pixelated "zoomed" image. 
+    // GL_NEAREST / More pixelated "zoomed" image.
     // GL_LINEAR / smoothed max zoom, less pixels
-    
+
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
     // Upload pixels into texture
     // --
     // passing the data from our (RawImageInfo) struct ( in raw_processing) to this function.
-    glTexImage2D(
-        GL_TEXTURE_2D,
-        0,
-        format,
-        width,
-        height,
-        0,
-        format,
-        GL_UNSIGNED_BYTE,
-        data
-    );
+    glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
     
     // helper function to glBindTexture
     unbind();
-    
-    return true;
 
+    return true;
 }
 
-void gl_photo_texture::bind() const {
+void gl_photo_texture::bind() const
+{
     glBindTexture(GL_TEXTURE_2D, textureID);
 }
 
-void gl_photo_texture::unbind() const {
+void gl_photo_texture::unbind() const
+{
     glBindTexture(GL_TEXTURE_2D, 0);
 }

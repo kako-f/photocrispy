@@ -1,8 +1,9 @@
-#include "photocrispy.h" 
+#include "photocrispy.h"
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
-#include <GLFW/glfw3.h> 
+#include <glad/glad.h>
+#include <GLFW/glfw3.h>
 #include <iostream>
 
 // (Error callback and other GLFW setup functions would go here)
@@ -14,7 +15,7 @@ static void glfw_error_callback(int error, const char *description)
 void SetDarkTheme()
 {
     // TODO
-    // change 
+    // change colors
     auto &colors = ImGui::GetStyle().Colors;
     colors[ImGuiCol_WindowBg] = ImVec4{0.1f, 0.105f, 0.11f, 1.0f};
 
@@ -61,13 +62,15 @@ int main()
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    // OSX
+    // glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 
     GLFWwindow *window = glfwCreateWindow(1920, 1080, "PhotoCrispy", nullptr, nullptr);
     if (window == nullptr)
     {
         std::cerr << "Failed to create GLFW window\n";
         glfwTerminate();
-        return 1;
+        return -1;
     }
     glfwMakeContextCurrent(window);
     glfwSwapInterval(1); // Enable vsync
@@ -87,14 +90,25 @@ int main()
     SetDarkTheme();
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init("#version 330");
-
+    
+    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
+    {
+        std::cerr << "Failed to load GLAD\n";
+        return -1;
+    }
     // TODO
     // Add fonts / Roboto
 
-    // 3. Create an instance of your PhotoCrispyApp
-    PhotoCrispy::PhotoCrispyApp app;
+    // 3. Create an instance PhotoCrispyApp
+    PhotoCrispy::PhotoCrispyApp app(window);
+
+    if (!app.initTriangle())
+        return -1;
+
+    app.initOpenglPhoto();
 
     // 4. Main loop
+    // TODO : Change exit method
     while (!glfwWindowShouldClose(window) && !app.VerifyExit()) // Check app's exit flag
     {
         // Poll and handle events (inputs, window resize, etc.)
@@ -114,14 +128,14 @@ int main()
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
-        // Render your application's UI
+        // Render UI
         app.RenderUI();
 
         // Rendering
         ImGui::Render();
         int display_w, display_h;
         glfwGetFramebufferSize(window, &display_w, &display_h);
-        glViewport(0, 0, display_w, display_h);
+        glViewport(0, 0, display_w, display_h); // 0,0 = lower left corner
         glClearColor(0.45f, 0.55f, 0.60f, 1.00f);
         glClear(GL_COLOR_BUFFER_BIT);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
@@ -142,6 +156,8 @@ int main()
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
+    app.closeTriangle();
+    app.closeOpenglPhoto();
 
     glfwDestroyWindow(window);
     glfwTerminate();

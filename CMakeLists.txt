@@ -7,6 +7,7 @@ find_package(glfw3 REQUIRED)
 find_package(libraw CONFIG REQUIRED)
 find_package(fmt CONFIG REQUIRED)
 find_package(nfd CONFIG REQUIRED)
+find_package(glad CONFIG REQUIRED)
 
 include_directories("${CMAKE_SOURCE_DIR}/vcpkg_installed/x64-windows/include")
 include_directories("include")
@@ -22,7 +23,6 @@ file(GLOB IMGUI_SRC
     ${IMGUI_PATH}/backends/imgui_impl_glfw.cpp
     ${IMGUI_PATH}/backends/imgui_impl_opengl3.cpp
 )
-
 
 add_library(ImGui STATIC ${IMGUI_SRC})
 
@@ -40,6 +40,9 @@ add_executable(photoraw
         src/threaded_load.cpp
         src/content_browser.cpp
         src/imageutils.cpp
+        src/image_processing.cpp
+        src/opengl_rendering.cpp
+        src/photo_shader.cpp
         )
 
 target_link_libraries(photoraw
@@ -50,4 +53,5 @@ target_link_libraries(photoraw
         fmt::fmt
         libraw::raw_r
         nfd::nfd
+        glad::glad
 )

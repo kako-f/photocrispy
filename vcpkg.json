@@ -4,6 +4,7 @@
   "dependencies": [
     "fmt",
     "libraw",
+    "glad",
     "glfw3",
     "nativefiledialog-extended",
     "opencv4"

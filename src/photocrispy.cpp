@@ -8,24 +8,27 @@
 #include "imgui.h"
 #include "nfd.hpp"
 #include <fmt/core.h>
-#include <GLFW/glfw3.h>
+
 #include <algorithm>
 
 namespace PhotoCrispy
 {
     // --- PhotoCrispyApp Class Implementation ---
-    PhotoCrispyApp::PhotoCrispyApp()
+    PhotoCrispyApp::PhotoCrispyApp(GLFWwindow* window)
         // Initialize member variables in the constructor's
-        : selectedFilePath(""),
+        : m_window(window),
+          selectedFilePath(""),
           shouldUpdateTexture(false),
           needsHistogramUpdate(false),
           shouldExitApp(false),
+          noClose(false),
           rawInfo(), // Constructor for RawImageInfo
           // rawJpg(),        //Constructor for RawImageInfo
           imageLoader(),   // Constructor for ThreadedImageLoader
           imageSelect(),   // Constructor for RawBrowser
           loadHistogram(), // Constructor for HistogramData
-          imageViewport()  // Constructor for ImageViewer
+          imageViewport(), // Constructor for ImageViewer
+          triangleRender() // Constructor for OpenglRendering // TESTING
     {
         // Any complex initialization can go here, but simple member initialization
         // is best done in the initializer list above.
@@ -37,11 +40,28 @@ namespace PhotoCrispy
         // Clean up any resources held by the class if necessary
         fmt::print("PhotoCrispyApp shutting down.\n");
     }
+    void PhotoCrispyApp::initOpenglPhoto()
+    {
+        imageViewport.setupImageRenderingQuad();
+    }
+    void PhotoCrispyApp::closeOpenglPhoto()
+    {
+        imageViewport.cleanupImageRenderingQuad();
+    }
+
+    bool PhotoCrispyApp::initTriangle()
+    {
+        return triangleRender.triangleInit(512, 512);
+    }
+    void PhotoCrispyApp::closeTriangle()
+    {
+        triangleRender.triangleCleanup();
+    }
     void PhotoCrispyApp::RenderUI()
     {
         RenderDockSpace();
         RenderMenuBar();
-        RenderLeftInfoPanel(); // Now accesses imageViewer directly
+        RenderLeftInfoPanel();
         RenderImageViewPanel();
         RenderImagePreviewPanel();
         RenderRightInfoPanel();
@@ -49,11 +69,6 @@ namespace PhotoCrispy
         // ImGui::ShowDemoWindow();
         // ImGui::ShowMetricsWindow();
     }
-
-/*     bool PhotoCrispyApp::VerifyExit() const
-    {
-        return shouldExitApp;
-    } */
 
     void PhotoCrispyApp::RenderDockSpace()
     {
@@ -108,6 +123,14 @@ namespace PhotoCrispy
                 ImGui::MenuItem("Patito"); // Placeholder/Test item
                 ImGui::EndMenu();
             }
+            if (ImGui::BeginMenu("About"))
+            {
+                if (ImGui::MenuItem("About PhotoCrispy"))
+                {
+                    noClose = true;
+                }
+                ImGui::EndMenu();
+            }
 
             ImGui::EndMainMenuBar();
         }
@@ -117,6 +140,27 @@ namespace PhotoCrispy
             loadHistogram = ImageUtils::calculateHistogram(rawInfo);
             needsHistogramUpdate = true;
         }
+        if (noClose)
+        {
+            const float window_width = ImGui::GetContentRegionAvail().x;
+            const float window_height = ImGui::GetContentRegionAvail().y;
+            
+            // Render triangle to FBO texture
+            triangleRender.triangleRender(window_width, window_height);
+            // we need to check orientation. 
+            // ImGui uses top-left vs OpenGL bottom-left
+            // we flip it with 
+            // uv0 = (0,0) → top-left 
+            // uv1 = (1,1) → bottom-right
+            // third and fouth argument of Image
+            ImGui::Begin("Triangle Window", &noClose);
+            ImGui::Text("Triangle rendered to FBO texture:");
+            ImGui::Image(
+                (intptr_t)triangleRender.triangleGetTexture(),
+                ImVec2(window_width, window_height), ImVec2(0,1), ImVec2(1,0));
+            ImGui::End();
+        }
+        
     }
 
     void PhotoCrispyApp::RenderLeftInfoPanel()
@@ -155,7 +199,8 @@ namespace PhotoCrispy
 
     void PhotoCrispyApp::RenderImageViewPanel()
     {
-        imageViewport.render(imageLoader); // Now passing the member image loader
+        // passing the member image loader
+        imageViewport.render(imageLoader, *m_window); 
 
         if (rawInfo.success && shouldUpdateTexture)
         {
@@ -163,15 +208,7 @@ namespace PhotoCrispy
             shouldUpdateTexture = false;
         }
 
-        /*
-        // Re-evaluate if rawJpg functionality is needed.
-        // If not, remove rawJpg member and this commented block.
-        if (rawJpg.is_jpeg_encoded && shouldUpdateTexture)
-        {
-            imageViewer.loadImage(rawJpg);
-            shouldUpdateTexture = false;
-        }
-        */
+
     }
 
     void PhotoCrispyApp::RenderRightInfoPanel()
@@ -184,71 +221,22 @@ namespace PhotoCrispy
 
             if (!loadHistogram.red.empty())
             {
-                float max_val = *std::max_element(loadHistogram.luminance.begin(), loadHistogram.luminance.end());
-                ImGui::Text("Max Bin Value: %.2f", max_val); // Display max normalized value
+                float graph_width = ImGui::GetContentRegionAvail().x;
+                float graph_height = 125.0f;
 
-                // Plot Luminance/Grayscale
-                ImGui::Text("Luminance");
-                ImGui::PushStyleColor(ImGuiCol_PlotLines, ImVec4(1.0f, 1.0f, 1.0f, 1.0f)); // White
-                ImGui::PlotLines(
-                    "##LuminanceHistogram",
-                    loadHistogram.luminance.data(),
-                    loadHistogram.luminance.size(),
-                    0,                                            // Offset
-                    NULL,                                         // Overlay text
-                    0.0f,                                         // Scale min
-                    1.0f,                                         // Scale max (normalized)
-                    ImVec2(ImGui::GetContentRegionAvail().x, 100) // Size of the plot
-                );
-                ImGui::PopStyleColor();
+                ImageUtils::drawOverlayedHistogram(loadHistogram, graph_width, graph_height);
 
-                // Plot Red Channel
-                ImGui::Text("Red Channel");
-                ImGui::PushStyleColor(ImGuiCol_PlotLines, ImVec4(1.0f, 0.0f, 0.0f, 1.0f)); // Red
-                ImGui::PlotLines(
-                    "##RedHistogram",
-                    loadHistogram.red.data(),
-                    loadHistogram.red.size(),
-                    0,
-                    NULL,
-                    0.0f,
-                    1.0f,
-                    ImVec2(ImGui::GetContentRegionAvail().x, 100));
-                ImGui::PopStyleColor();
-
-                // Plot Green Channel
-                ImGui::Text("Green Channel");
-                ImGui::PushStyleColor(ImGuiCol_PlotLines, ImVec4(0.0f, 1.0f, 0.0f, 1.0f)); // Green
-                ImGui::PlotLines(
-                    "##GreenHistogram",
-                    loadHistogram.green.data(),
-                    loadHistogram.green.size(),
-                    0,
-                    NULL,
-                    0.0f,
-                    1.0f,
-                    ImVec2(ImGui::GetContentRegionAvail().x, 100));
-                ImGui::PopStyleColor();
-
-                // Plot Blue Channel
-                ImGui::Text("Blue Channel");
-                ImGui::PushStyleColor(ImGuiCol_PlotLines, ImVec4(0.0f, 0.0f, 1.0f, 1.0f)); // Blue
-                ImGui::PlotLines(
-                    "##BlueHistogram",
-                    loadHistogram.blue.data(),
-                    loadHistogram.blue.size(),
-                    0,
-                    NULL,
-                    0.0f,
-                    1.0f,
-                    ImVec2(ImGui::GetContentRegionAvail().x, 100));
-                ImGui::PopStyleColor();
-            }
-            else
-            {
-                ImGui::Text("No histogram data available.");
+                // Optional: Add a legend or labels below the plot
+                ImGui::TextColored(ImVec4(1.0f, 1.0f, 1.0f, 1.0f), "L");
+                ImGui::SameLine();
+                ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "R");
+                ImGui::SameLine();
+                ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "G");
+                ImGui::SameLine();
+                ImGui::TextColored(ImVec4(0.0f, 0.0f, 1.0f, 1.0f), "B");
             }
         }
+
         ImGui::End();
     }
 
