@@ -5,8 +5,8 @@
 #include "content_browser.h"
 #include "imageutils.h"
 #include "opengl_rendering.h"
-#include <GLFW/glfw3.h> 
-#include <string>
+
+#include <GLFW/glfw3.h>
 
 namespace PhotoCrispy
 {
@@ -31,7 +31,7 @@ namespace PhotoCrispy
         bool shouldExitApp = false;
         bool noClose = false;
 
-        GLFWwindow *m_window; // Store the GLFW window pointer 
+        GLFWwindow *currentWindow; // Store the GLFW window pointer
 
         // Instances of other modules/classes that hold state
         RawProcessor::RawImageInfo rawInfo;
@@ -39,29 +39,25 @@ namespace PhotoCrispy
         ThreadLoader::ThreadedImageLoader imageLoader;
         ContentBrowser::RawBrowser imageSelect;
         ImageUtils::HistogramData loadHistogram;
-
-        OpenGlRendering::TriangleRendering triangleRender; // TESTING
+        
+        // About window
+        OpenGlRendering::TriangleRendering triangleRender;
 
         // ImageViewer instance
         ImageProcessor::ImageViewer imageViewport;
 
     public:
         // Constructor
-        PhotoCrispyApp(GLFWwindow* window);
+        PhotoCrispyApp(GLFWwindow *window);
         // Destructor if needed for cleanup
         ~PhotoCrispyApp();
 
         // OpenGL Triangle
-        bool initTriangle();
-        // OpenGL Photo
-        void initOpenglPhoto();
-        void closeOpenglPhoto();
-        // OpenGL Triangle
         void closeTriangle();
         // Render Program UI
-        void RenderUI();
+        void renderUI();
         // Check if the app should exit
-        bool VerifyExit() const { return shouldExitApp; }
+        bool verifyExit() const { return shouldExitApp; }
     };
 
 }

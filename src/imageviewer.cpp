@@ -1,71 +1,7 @@
 #include "imageviewer.h"
-#include "threaded_load.h"
-#include <algorithm>
-#include <iostream>
-#include "stb_image.h"
-#include "image_processing.h"
-#include <GLFW/glfw3.h>
 
 namespace ImageProcessor
 {
-
-    void ImageViewer::setupImageRenderingQuad()
-    {
-        // Define vertices for a quad that covers the texture.
-        // We'll use normalized device coordinates (-1 to 1) for position
-        // and 0 to 1 for texture coordinates.
-        float vertices[] = {
-            // positions        // texture coords
-            1.0f, 1.0f, 0.0f, 1.0f, 1.0f,   // top right
-            1.0f, -1.0f, 0.0f, 1.0f, 0.0f,  // bottom right
-            -1.0f, -1.0f, 0.0f, 0.0f, 0.0f, // bottom left
-            -1.0f, 1.0f, 0.0f, 0.0f, 1.0f   // top left
-        };
-
-        unsigned int indices[] = {
-            0, 1, 3, // first triangle
-            1, 2, 3  // second triangle
-        };
-
-        glGenVertexArrays(1, &VAO);
-        glGenBuffers(1, &VBO);
-        glGenBuffers(1, &EBO);
-
-        std::cout << "VAO ID: " << VAO << std::endl;
-        std::cout << "VBO ID: " << VBO << std::endl;
-        std::cout << "EBO ID: " << EBO << std::endl;
-
-        glBindVertexArray(VAO);
-
-        glBindBuffer(GL_ARRAY_BUFFER, VBO);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
-
-        // Position attribute
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void *)0);
-        glEnableVertexAttribArray(0);
-        // Texture coordinate attribute
-        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void *)(3 * sizeof(float)));
-        glEnableVertexAttribArray(1);
-
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
-        glBindVertexArray(0);
-    }
-
-    void ImageViewer::cleanupImageRenderingQuad()
-    {
-        glDeleteVertexArrays(1, &VAO);
-        glDeleteBuffers(1, &VBO);
-        glDeleteBuffers(1, &EBO);
-        if (imageShader)
-        {
-            delete imageShader; // If you allocated with 'new'
-            imageShader = nullptr;
-        }
-    }
-
     void ImageViewer::loadImage(const RawProcessor::RawImageInfo &imageInfo)
     {
         // New GL texture
@@ -78,6 +14,7 @@ namespace ImageProcessor
             // save original image and create a copy to processed
             originalImageData = imageInfo.data;
             imageTexture.create_texture(imageInfo.width, imageInfo.height, imageInfo.colors, imageInfo.data.data());
+            fmt::print("image loaded in texture id {}\n", imageTexture.getID());
         }
         else if (imageInfo.is_jpeg_encoded)
         {
@@ -99,9 +36,6 @@ namespace ImageProcessor
         imageZoom = 1.0f;
         panningOffset = ImVec2(0, 0);
         hasTexture = true;
-
-        imageShader = new PhotoShader("../../include/shaders/photo_vertex.shader", "../../include/shaders/photo_fragment.shader");
-        fmt::print("shader id {}", imageShader->ID);
     }
 
     void ImageViewer::render(const ThreadLoader::ThreadedImageLoader &imageLoader, GLFWwindow &window)
@@ -165,10 +99,7 @@ namespace ImageProcessor
 
         // Render scaled image
         ImGui::Image((ImTextureID)(intptr_t)imageTexture.getID(), ImVec2(drawWidth, drawHeight));
-
-
         handleInput(ImVec2(drawWidth, drawHeight), avail, centeredPos);
-
         ImGui::End();
     }
 

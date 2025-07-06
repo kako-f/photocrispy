@@ -1,4 +1,5 @@
-#include "photo_shader.h"
+#include "opengl_shader.h"
+
 
 PhotoShader::PhotoShader(const char *vertexPath, const char *fragmentPath)
 {
@@ -30,41 +31,26 @@ PhotoShader::PhotoShader(const char *vertexPath, const char *fragmentPath)
     }
     catch (std::ifstream::failure e)
     {
-        std::cerr << "ERROR::SHADER::FILE_NOT_SUCCESFULLY_READ: " << e.what() << std::endl;
+        fmt::print("ERROR::SHADER::FILE_NOT_SUCCESFULLY_READ: {}", e.what());
     }
     const char *vShaderCode = vertexCode.c_str();
     const char *fShaderCode = fragmentCode.c_str();
 
     // 2. Compile shaders
     unsigned int vertex, fragment;
-    int success;
-    char infoLog[512];
-
+    
     // vertex shader
     vertex = glCreateShader(GL_VERTEX_SHADER);
     glShaderSource(vertex, 1, &vShaderCode, nullptr);
     glCompileShader(vertex);
     // print compile errors if any
-    glGetShaderiv(vertex, GL_COMPILE_STATUS, &success);
-    if (!success)
-    {
-        glGetShaderInfoLog(vertex, 512, nullptr, infoLog);
-        std::cerr << "ERROR::SHADER::VERTEX::COMPILATION_FAILED\n"
-                  << infoLog << std::endl;
-    };
+    checkCompileErrors(vertex, "VERTEX");
 
     // fragment shader
     fragment = glCreateShader(GL_FRAGMENT_SHADER);
     glShaderSource(fragment, 1, &fShaderCode, nullptr);
     glCompileShader(fragment);
-    // print compile errors if any
-    glGetShaderiv(fragment, GL_COMPILE_STATUS, &success);
-    if (!success)
-    {
-        glGetShaderInfoLog(fragment, 512, nullptr, infoLog);
-        std::cerr << "ERROR::SHADER::FRAGMENT::COMPILATION_FAILED\n"
-                  << infoLog << std::endl;
-    }
+    checkCompileErrors(fragment, "FRAGMENT");
 
     // Shader program
     ID = glCreateProgram();
@@ -72,15 +58,9 @@ PhotoShader::PhotoShader(const char *vertexPath, const char *fragmentPath)
     glAttachShader(ID, fragment);
     glLinkProgram(ID);
 
-    // Print linking errors if any
-    glGetProgramiv(ID, GL_LINK_STATUS, &success);
-    if (!success)
-    {
-        glGetProgramInfoLog(ID, 512, nullptr, infoLog);
-        std::cerr << "ERROR::SHADER::PROGRAM::LINKING_FAILED\n"
-                  << infoLog << std::endl;
-    }
-    std::cout << "Shader Program ID: " << ID << std::endl;
+    checkCompileErrors(ID, "PROGRAM");
+
+    fmt::print("Shader Program ID: {}\n", ID);
     // delete the shaders as they're linked into our program now and no longer necessary
     glDeleteShader(vertex);
     glDeleteShader(fragment);
@@ -101,8 +81,4 @@ void PhotoShader::setFloat(const std::string &name, float value) const
 void PhotoShader::setInt(const std::string &name, int value) const
 {
     glUniform1i(glGetUniformLocation(ID, name.c_str()), value);
-}
-void PhotoShader::setVec3(const std::string &name, float x, float y, float z) const
-{
-    glUniform3f(glGetUniformLocation(ID, name.c_str()), x, y, z);
 }

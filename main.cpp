@@ -102,14 +102,8 @@ int main()
     // 3. Create an instance PhotoCrispyApp
     PhotoCrispy::PhotoCrispyApp app(window);
 
-    if (!app.initTriangle())
-        return -1;
-
-    app.initOpenglPhoto();
-
     // 4. Main loop
-    // TODO : Change exit method
-    while (!glfwWindowShouldClose(window) && !app.VerifyExit()) // Check app's exit flag
+    while (!glfwWindowShouldClose(window) && !app.verifyExit()) // Check app's exit flag
     {
         // Poll and handle events (inputs, window resize, etc.)
         // You can read the io.WantCaptureMouse, io.WantCaptureKeyboard flags to tell if dear imgui wants to use your inputs.
@@ -129,7 +123,7 @@ int main()
         ImGui::NewFrame();
 
         // Render UI
-        app.RenderUI();
+        app.renderUI();
 
         // Rendering
         ImGui::Render();
@@ -157,7 +151,6 @@ int main()
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
     app.closeTriangle();
-    app.closeOpenglPhoto();
 
     glfwDestroyWindow(window);
     glfwTerminate();

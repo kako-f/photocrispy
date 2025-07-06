@@ -40,9 +40,9 @@ add_executable(photoraw
         src/threaded_load.cpp
         src/content_browser.cpp
         src/imageutils.cpp
-        src/image_processing.cpp
         src/opengl_rendering.cpp
-        src/photo_shader.cpp
+        src/opengl_shader.cpp
+        src/opengl_framebuffer.cpp
         )
 
 target_link_libraries(photoraw

@@ -14,9 +14,9 @@
 namespace PhotoCrispy
 {
     // --- PhotoCrispyApp Class Implementation ---
-    PhotoCrispyApp::PhotoCrispyApp(GLFWwindow* window)
+    PhotoCrispyApp::PhotoCrispyApp(GLFWwindow *window)
         // Initialize member variables in the constructor's
-        : m_window(window),
+        : currentWindow(window),
           selectedFilePath(""),
           shouldUpdateTexture(false),
           needsHistogramUpdate(false),
@@ -28,11 +28,17 @@ namespace PhotoCrispy
           imageSelect(),   // Constructor for RawBrowser
           loadHistogram(), // Constructor for HistogramData
           imageViewport(), // Constructor for ImageViewer
-          triangleRender() // Constructor for OpenglRendering // TESTING
+          triangleRender() // Constructor for OpenglRendering - About Window
     {
         // Any complex initialization can go here, but simple member initialization
         // is best done in the initializer list above.
         // For example, if ImageViewer needed parameters, they'd go there.
+
+        int fb_width, fb_height;
+        glfwGetFramebufferSize(window, &fb_width, &fb_height);
+        //fmt::print("{} {}", fb_height, fb_width);
+        triangleRender.triangleInit((float)fb_height, (float)fb_width);
+
         fmt::print("PhotoCrispyApp initialized.\n");
     }
     PhotoCrispyApp::~PhotoCrispyApp()
@@ -40,24 +46,12 @@ namespace PhotoCrispy
         // Clean up any resources held by the class if necessary
         fmt::print("PhotoCrispyApp shutting down.\n");
     }
-    void PhotoCrispyApp::initOpenglPhoto()
-    {
-        imageViewport.setupImageRenderingQuad();
-    }
-    void PhotoCrispyApp::closeOpenglPhoto()
-    {
-        imageViewport.cleanupImageRenderingQuad();
-    }
 
-    bool PhotoCrispyApp::initTriangle()
-    {
-        return triangleRender.triangleInit(512, 512);
-    }
     void PhotoCrispyApp::closeTriangle()
     {
         triangleRender.triangleCleanup();
     }
-    void PhotoCrispyApp::RenderUI()
+    void PhotoCrispyApp::renderUI()
     {
         RenderDockSpace();
         RenderMenuBar();
@@ -142,25 +136,29 @@ namespace PhotoCrispy
         }
         if (noClose)
         {
-            const float window_width = ImGui::GetContentRegionAvail().x;
-            const float window_height = ImGui::GetContentRegionAvail().y;
-            
-            // Render triangle to FBO texture
-            triangleRender.triangleRender(window_width, window_height);
-            // we need to check orientation. 
+
+            // we need to check orientation.
             // ImGui uses top-left vs OpenGL bottom-left
-            // we flip it with 
-            // uv0 = (0,0) → top-left 
+            // we flip it with
+            // uv0 = (0,0) → top-left
             // uv1 = (1,1) → bottom-right
             // third and fouth argument of Image
+            // ImVec2(window_width, window_height)
+            // triangleRender.triangleGetTexture()
             ImGui::Begin("Triangle Window", &noClose);
+
+            const float window_width = ImGui::GetContentRegionAvail().x;
+            const float window_height = ImGui::GetContentRegionAvail().y;
+
+            fmt::print("w: {}, h: {}\n", window_width, window_height);
+            // Render triangle to FBO texture
+            triangleRender.triangleRender(window_width, window_height);
             ImGui::Text("Triangle rendered to FBO texture:");
             ImGui::Image(
                 (intptr_t)triangleRender.triangleGetTexture(),
-                ImVec2(window_width, window_height), ImVec2(0,1), ImVec2(1,0));
+                ImGui::GetContentRegionAvail(), ImVec2(0, 1), ImVec2(1, 0));
             ImGui::End();
         }
-        
     }
 
     void PhotoCrispyApp::RenderLeftInfoPanel()
@@ -200,15 +198,13 @@ namespace PhotoCrispy
     void PhotoCrispyApp::RenderImageViewPanel()
     {
         // passing the member image loader
-        imageViewport.render(imageLoader, *m_window); 
+        imageViewport.render(imageLoader, *currentWindow);
 
         if (rawInfo.success && shouldUpdateTexture)
         {
             imageViewport.loadImage(rawInfo);
             shouldUpdateTexture = false;
         }
-
-
     }
 
     void PhotoCrispyApp::RenderRightInfoPanel()
