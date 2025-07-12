@@ -1,8 +1,7 @@
-#include "libraw.h"
 #include "raw_processing.h"
-#include <fmt/core.h>
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
+#include "libraw.h"
 
 namespace RawProcessor
 {
@@ -15,32 +14,37 @@ namespace RawProcessor
         // Open RAW  photo file
         if (ret = photoRawProcessor.open_file(raw_image_filepath.c_str()) != LIBRAW_SUCCESS)
         {
-            fmt::print("Error opening {}", raw_image_filepath.c_str());
-            result.success = false;
+            fmt::print(stderr, "Error opening {}: {}\n", raw_image_filepath, libraw_strerror(ret));
+            return result;
         }
+        // RAW Processing params.
+        // to modify further.
+        photoRawProcessor.imgdata.params.no_auto_bright = 1; // No auto brightness
+        photoRawProcessor.imgdata.params.user_qual = 0;      // Fastest demosaic (linear)
+        photoRawProcessor.imgdata.params.use_camera_wb = 1;       // No gamma correction
+        photoRawProcessor.imgdata.params.use_camera_matrix = 0; // color profile
 
         // unpacking the data
         if (ret = photoRawProcessor.unpack() != LIBRAW_SUCCESS)
         {
-            fmt::print("Error getting the data of {}", raw_image_filepath.c_str());
-            photoRawProcessor.recycle();
-            result.success = false;
+            fmt::print(stderr, "Error getting the data of {}: {}\n", raw_image_filepath, libraw_strerror(ret));
+
+            return result;
         }
 
         //  processing pipeline, to modify
         if (ret = photoRawProcessor.dcraw_process() != LIBRAW_SUCCESS)
         {
-            fmt::print("Cannot process {}", raw_image_filepath.c_str());
-            photoRawProcessor.recycle();
-            result.success = false;
+            fmt::print(stderr, "Cannot process {}: {}\n", raw_image_filepath, libraw_strerror(ret));
+
+            return result;
         }
 
-        // Process RAW data
+        // Process RAW data and get memory image
         libraw_processed_image_t *image = photoRawProcessor.dcraw_make_mem_image();
         if (!image)
         {
-            fmt::print("Failed to create processed image in memory {}", raw_image_filepath.c_str());
-            photoRawProcessor.recycle();
+            fmt::print(stderr, "Failed to create processed image in memory for {}. Possible memory exhaustion or prior error.\n", raw_image_filepath);
             result.success = false;
         }
         else
@@ -55,10 +59,12 @@ namespace RawProcessor
 
             result.cam_make = photoRawProcessor.imgdata.idata.normalized_make;
             result.cam_model = photoRawProcessor.imgdata.idata.normalized_model;
-
+            result.lens_model = photoRawProcessor.imgdata.lens.Lens;
             // Copy pixel data
             size_t size = image->width * image->height * image->colors;
+
             result.data = std::vector<unsigned char>(image->data, image->data + size);
+
             // clearing memory and recycling
             photoRawProcessor.dcraw_clear_mem(image);
             photoRawProcessor.recycle();
@@ -66,6 +72,7 @@ namespace RawProcessor
 
         return result;
     }
+
     RawImageInfo RawProcessor::loadJpgPreview(const std::string &raw_image_filepath)
     {
         LibRaw photoRawProcessor;

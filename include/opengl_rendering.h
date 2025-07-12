@@ -14,17 +14,13 @@ namespace OpenGlRendering
     class TriangleRendering
     {
     private:
-        unsigned int FBO;
         unsigned int textureColorBuffer;
-        unsigned int RBO;
-        unsigned int EBO;
-        unsigned int VAO, VBO;
+        unsigned int FBO, VAO, VBO, RBO;
+        PhotoShader *textureShader = nullptr;
 
     public:
         void openglInit();
 
-        PhotoShader *textureShader = nullptr;
-        
         bool triangleInit(float texWidth, float texHeight);
         void triangleRender(const float width, const float height);
         void rescaleFBO(float width, float height);

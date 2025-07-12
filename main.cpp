@@ -65,6 +65,9 @@ int main()
     // OSX
     // glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 
+    // Maximzed window
+    glfwWindowHint(GLFW_MAXIMIZED, GLFW_TRUE);
+
     GLFWwindow *window = glfwCreateWindow(1920, 1080, "PhotoCrispy", nullptr, nullptr);
     if (window == nullptr)
     {
@@ -90,7 +93,7 @@ int main()
     SetDarkTheme();
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init("#version 330");
-    
+
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
     {
         std::cerr << "Failed to load GLAD\n";
@@ -150,7 +153,6 @@ int main()
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
-    app.closeTriangle();
 
     glfwDestroyWindow(window);
     glfwTerminate();

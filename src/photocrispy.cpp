@@ -1,6 +1,5 @@
 #include "photocrispy.h"
 #include "raw_processing.h"
-#include "gl_photo_texture.h"
 #include "imageviewer.h"
 #include "threaded_load.h"
 #include "content_browser.h"
@@ -36,20 +35,19 @@ namespace PhotoCrispy
 
         int fb_width, fb_height;
         glfwGetFramebufferSize(window, &fb_width, &fb_height);
-        //fmt::print("{} {}", fb_height, fb_width);
+        // fmt::print("{} {}", fb_height, fb_width);
+
         triangleRender.triangleInit((float)fb_height, (float)fb_width);
+
+        imageViewport.photoFBO((float)fb_height, (float)fb_width);
 
         fmt::print("PhotoCrispyApp initialized.\n");
     }
     PhotoCrispyApp::~PhotoCrispyApp()
     {
         // Clean up any resources held by the class if necessary
-        fmt::print("PhotoCrispyApp shutting down.\n");
-    }
-
-    void PhotoCrispyApp::closeTriangle()
-    {
         triangleRender.triangleCleanup();
+        fmt::print("PhotoCrispyApp shutting down.\n");
     }
     void PhotoCrispyApp::renderUI()
     {
@@ -61,7 +59,7 @@ namespace PhotoCrispy
         RenderRightInfoPanel();
 
         // ImGui::ShowDemoWindow();
-        // ImGui::ShowMetricsWindow();
+        ImGui::ShowMetricsWindow();
     }
 
     void PhotoCrispyApp::RenderDockSpace()
@@ -93,6 +91,7 @@ namespace PhotoCrispy
                         selectedFilePath = outPath.get();
                         fmt::print("Success!! {}\n", selectedFilePath); // fmt can directly print std::string
                         imageLoader.startAsyncLoad(selectedFilePath);
+                        imageViewport.resetImageModifications();
                     }
                     else if (result == NFD_CANCEL)
                     {
@@ -166,11 +165,10 @@ namespace PhotoCrispy
         ImGui::Begin("Image Information");
         if (rawInfo.success)
         {
-
             ImGui::TextWrapped("Opened file path: %s", selectedFilePath.c_str());
             ImGui::TextWrapped("Image Size: %d x %d", rawInfo.width, rawInfo.height);
             ImGui::TextWrapped("Camera make: %s", rawInfo.cam_make.c_str());
-            ImGui::TextWrapped("Camera model: %s", rawInfo.cam_model.c_str());
+            ImGui::TextWrapped("Lense: %s", rawInfo.lens_model.c_str());
             ImGui::Separator();
             // from 10% to 1000%
             float zoom = imageViewport.getZoom() * 100;
@@ -197,14 +195,30 @@ namespace PhotoCrispy
 
     void PhotoCrispyApp::RenderImageViewPanel()
     {
+        /*         ImGui::Begin("Photo Window");
+
+                const float window_width = ImGui::GetContentRegionAvail().x;
+                const float window_height = ImGui::GetContentRegionAvail().y;
+
+                fmt::print("w: {}, h: {}\n", window_width, window_height);
+                // Render triangle to FBO texture
+                imageViewport.render2(window_height,window_height);
+                ImGui::Text("patito:");
+                ImGui::Image(
+                    (intptr_t)imageViewport.photoOpenglGetTexture(),
+                    ImVec2(window_width, window_height), ImVec2(0, 1), ImVec2(1, 0));
+
+                ImGui::End(); */
+
         // passing the member image loader
-        imageViewport.render(imageLoader, *currentWindow);
 
         if (rawInfo.success && shouldUpdateTexture)
         {
-            imageViewport.loadImage(rawInfo);
+            imageViewport.loadImage2(rawInfo);
             shouldUpdateTexture = false;
         }
+
+        imageViewport.render3(imageLoader);
     }
 
     void PhotoCrispyApp::RenderRightInfoPanel()
@@ -230,6 +244,29 @@ namespace PhotoCrispy
                 ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "G");
                 ImGui::SameLine();
                 ImGui::TextColored(ImVec4(0.0f, 0.0f, 1.0f, 1.0f), "B");
+            }
+        }
+        if (rawInfo.success)
+        {
+            // we need to reset the values when loading a new pict
+            float currentPhotoBrightness = imageViewport.getBrightness();
+            if (ImGui::SliderFloat("Exposure", &currentPhotoBrightness, -1.0f, 2.0f, "%.4f"))
+            {
+                // update class value if slider changed
+                imageViewport.setBrightness(currentPhotoBrightness);
+            }
+
+            float currentFs = imageViewport.getFs();
+            if (ImGui::SliderFloat("top Shadows", &currentFs, -1.0f, 1.0f, "%.3f"))
+            {
+                // update class value if slider changed
+                imageViewport.setfs(currentFs);
+            }
+            float currentLs = imageViewport.getLs();
+            if (ImGui::SliderFloat("low Shadows", &currentLs, -1.0f, 1.0f, "%.3f"))
+            {
+                // update class value if slider changed
+                imageViewport.setls(currentLs);
             }
         }
 

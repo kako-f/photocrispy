@@ -1,6 +1,5 @@
 #include "opengl_rendering.h"
 
-
 // Modern OpenGL requires that we at least set up a vertex and fragment shader if we want to do some rendering
 // The Vertex Shader is the programmable Shader stage in the rendering pipeline that handles the processing of individual vertices.
 // The fragment shader is all about calculating the color output of your pixels.
@@ -12,12 +11,8 @@ namespace OpenGlRendering
 {
     void TriangleRendering::openglInit()
     {
-        // vertex array object (VAO)
-        // when configuring vertex attribute pointers you only have to make those calls once and whenever we want to draw the object,
-        // we can just bind the corresponding VAO. This makes switching between different vertex data and attribute configurations as easy as binding a different VAO
-        glGenVertexArrays(1, &VAO);
-        glBindVertexArray(VAO);
-
+        // build and compile our shader program
+        textureShader = new PhotoShader("../../include/shaders/triangle_vertex.vert", "../../include/shaders/triangle_fragment.frag");
         // === Triangle ===
         // range between -1.0 and 1.0 on all 3 axes (x, y and z)
 
@@ -41,6 +36,11 @@ namespace OpenGlRendering
             0.0f, 1.0f, 0.0f,   // top
         };
 
+        // vertex array object (VAO)
+        // when configuring vertex attribute pointers you only have to make those calls once and whenever we want to draw the object,
+        // we can just bind the corresponding VAO. This makes switching between different vertex data and attribute configurations as easy as binding a different VAO
+        glGenVertexArrays(1, &VAO);
+        glBindVertexArray(VAO);
         // Create a Vector Buffer Object (VBO) that will store the vertices on video memory
         // VBO can store a large number of vertices in the GPU's memory. They have unique ID
         // OpenGL allows us to bind to several buffers at once as long as they have a different buffer type.
@@ -59,10 +59,11 @@ namespace OpenGlRendering
 
         // shaderProgram = createShaderProgram("../../include/shaders/triangle_vertex.shader", "../../include/shaders/triangle_fragment.shader");
 
-        textureShader = new PhotoShader("../../include/shaders/triangle_vertex.shader", "../../include/shaders/triangle_fragment.shader");
-
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void *)0);
         glEnableVertexAttribArray(0);
+
+        // note that this is allowed, the call to glVertexAttribPointer registered VBO as the vertex attribute's bound vertex buffer object so afterwards we can safely unbind
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
     }
     void TriangleRendering::rescaleFBO(float width, float height)
     {
@@ -86,9 +87,12 @@ namespace OpenGlRendering
 
         glGenTextures(1, &textureColorBuffer);
         glBindTexture(GL_TEXTURE_2D, textureColorBuffer);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, (GLsizei)width, (GLsizei)height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, (GLsizei)width, (GLsizei)height, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glBindTexture(GL_TEXTURE_2D, 0);
+        
+        // attach it to currently bound framebuffer object
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, textureColorBuffer, 0);
 
         glGenRenderbuffers(1, &RBO);
@@ -97,10 +101,9 @@ namespace OpenGlRendering
         glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, RBO);
 
         if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-            std::cout << "ERROR::FRAMEBUFFER:: Framebuffer is not complete!\n";
+            fmt::print("ERROR::FRAMEBUFFER:: Framebuffer is not complete!\n");
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        glBindTexture(GL_TEXTURE_2D, 0);
         glBindRenderbuffer(GL_RENDERBUFFER, 0);
 
         openglInit();
@@ -112,11 +115,10 @@ namespace OpenGlRendering
     {
         // Bind FBO → render to texture
         glBindFramebuffer(GL_FRAMEBUFFER, FBO);
-        //createdFBO.bindFBO();
-        //createdFBO.rescaleFBO(width, height);
         rescaleFBO(width, height);
         glViewport(0, 0, (GLsizei)width, (GLsizei)height);
-        glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+        // make sure we clear the framebuffer's content
+        glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         // use the glProgram with the shaders
@@ -134,8 +136,8 @@ namespace OpenGlRendering
         glDrawArrays(GL_TRIANGLES, 0, 12);
         // glDrawElements to indicate we want to render the triangles from an index buffer.
         // glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-        // createdFBO.unbindFBO();
         glBindFramebuffer(GL_FRAMEBUFFER, 0); // back to screen
+        
     }
 
     void TriangleRendering::triangleCleanup()
@@ -145,7 +147,6 @@ namespace OpenGlRendering
         glDeleteRenderbuffers(1, &RBO);
         glDeleteVertexArrays(1, &VAO);
         glDeleteBuffers(1, &VBO);
-        glDeleteBuffers(1, &EBO);
         glDeleteProgram(textureShader->ID);
     }
 

@@ -31,7 +31,7 @@ PhotoShader::PhotoShader(const char *vertexPath, const char *fragmentPath)
     }
     catch (std::ifstream::failure e)
     {
-        fmt::print("ERROR::SHADER::FILE_NOT_SUCCESFULLY_READ: {}", e.what());
+        fmt::print("ERROR::SHADER::FILE_NOT_SUCCESFULLY_READ: {}\n", e.what());
     }
     const char *vShaderCode = vertexCode.c_str();
     const char *fShaderCode = fragmentCode.c_str();
