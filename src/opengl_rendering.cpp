@@ -16,24 +16,37 @@ namespace OpenGlRendering
         // === Triangle ===
         // range between -1.0 and 1.0 on all 3 axes (x, y and z)
 
+        /*         float vertices[] = {
+                    // y,x,z
+                    // first triangle
+                    0.0f, 0.0f, 0.0f,   // left
+                    0.5f, 0.0f, 0.0f,   // right
+                    0.25f, 0.5f, 0.0f,  // top
+                                        // first triangle
+                    0.0f, 0.0f, 0.0f,   // left
+                    -0.5f, 0.0f, 0.0f,  // right
+                    -0.25f, 0.5f, 0.0f, // top
+                                        // sec triangle
+                    0.0f, 0.0f, 0.0f,   // left
+                    -0.5f, 0.0f, 0.0f,  // right
+                    -0.25f, 0.5f, 0.0f, // top
+                                        // third triangle
+                    -0.25f, 0.5f, 0.0f, // left
+                    0.25f, 0.5f, 0.0f,  // right
+                    0.0f, 1.0f, 0.0f,   // top
+                }; */
+
         float vertices[] = {
-            // y,x,z
-            // first triangle
-            0.0f, 0.0f, 0.0f,   // left
-            0.5f, 0.0f, 0.0f,   // right
-            0.25f, 0.5f, 0.0f,  // top
-                                // first triangle
-            0.0f, 0.0f, 0.0f,   // left
-            -0.5f, 0.0f, 0.0f,  // right
-            -0.25f, 0.5f, 0.0f, // top
-                                // sec triangle
-            0.0f, 0.0f, 0.0f,   // left
-            -0.5f, 0.0f, 0.0f,  // right
-            -0.25f, 0.5f, 0.0f, // top
-                                // third triangle
-            -0.25f, 0.5f, 0.0f, // left
-            0.25f, 0.5f, 0.0f,  // right
-            0.0f, 1.0f, 0.0f,   // top
+            // positions          // colors          
+            0.5f,  0.5f, 0.0f,   1.0f, 0.0f, 0.0f,  // top right
+            0.5f, -0.5f, 0.0f,   0.0f, 1.0f, 0.0f,  // bottom right
+            -0.5f, -0.5f, 0.0f,   0.0f, 0.0f, 1.0f,  // bottom left
+            -0.5f,  0.5f, 0.0f,   1.0f, 1.0f, 0.0f,  // top left 
+        }; 
+        unsigned int indices[] = {
+            // note that we start from 0!
+            0, 1, 3, // first triangle
+            1, 2, 3  // second triangle
         };
 
         // vertex array object (VAO)
@@ -53,17 +66,26 @@ namespace OpenGlRendering
         // actual data to sent
         // The fourth parameter specifies how we want the graphics card to manage the given data. This can take 3 forms:
         // GL_STREAM_DRAW: the data is set only once and used by the GPU at most a few times.
-        // GL_STATIC_DRAW: the data is set only once and used many times.
+        // GL_STATIC_DRAW: the data is set only once and used many times.y
         // GL_DYNAMIC_DRAW: the data is changed a lot and used many times.
         glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
+        glGenBuffers(1, &EBO);
+
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+
         // shaderProgram = createShaderProgram("../../include/shaders/triangle_vertex.shader", "../../include/shaders/triangle_fragment.shader");
 
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void *)0);
+        // position attribute
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void *)0);
         glEnableVertexAttribArray(0);
+        // color attribute
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void *)(3 * sizeof(float)));
+        glEnableVertexAttribArray(1);
 
         // note that this is allowed, the call to glVertexAttribPointer registered VBO as the vertex attribute's bound vertex buffer object so afterwards we can safely unbind
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        //glBindBuffer(GL_ARRAY_BUFFER, 0);
     }
     void TriangleRendering::rescaleFBO(float width, float height)
     {
@@ -91,7 +113,7 @@ namespace OpenGlRendering
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         glBindTexture(GL_TEXTURE_2D, 0);
-        
+
         // attach it to currently bound framebuffer object
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, textureColorBuffer, 0);
 
@@ -119,25 +141,27 @@ namespace OpenGlRendering
         glViewport(0, 0, (GLsizei)width, (GLsizei)height);
         // make sure we clear the framebuffer's content
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glClear(GL_COLOR_BUFFER_BIT);
+        // glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         // use the glProgram with the shaders
         textureShader->use();
 
         // update the uniform color
-        float timeValue = (float)glfwGetTime();
+/*         float timeValue = (float)glfwGetTime();
         float greenValue = sin(timeValue) / 2.0f + 0.5f;
         int vertexColorLocation = glGetUniformLocation(textureShader->ID, "ourColor");
-        glUniform4f(vertexColorLocation, 0.0f, greenValue, 0.0f, 1.0f);
+        glUniform4f(vertexColorLocation, 0.0f, greenValue, 0.0f, 1.0f); */
 
         glBindVertexArray(VAO);
         // GL_Triangles = opengl primitive.
         // Some of these hints are GL_POINTS, GL_TRIANGLES and GL_LINE_STRIP
-        glDrawArrays(GL_TRIANGLES, 0, 12);
+
+        // glDrawArrays(GL_TRIANGLES, 0, 6);
         // glDrawElements to indicate we want to render the triangles from an index buffer.
-        // glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-        glBindFramebuffer(GL_FRAMEBUFFER, 0); // back to screen
         
+        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+        glBindFramebuffer(GL_FRAMEBUFFER, 0); // back to screen
     }
 
     void TriangleRendering::triangleCleanup()

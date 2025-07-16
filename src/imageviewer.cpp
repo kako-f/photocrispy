@@ -174,7 +174,8 @@ namespace ImageProcessor
         }
         else if (imageLoader.isLoading())
         {
-            ImGui::Text("Loading %c", "|/-\\"[(int)(ImGui::GetTime() / 0.05f) & 3]);
+            ImGui::ProgressBar(-1.0f * (float)ImGui::GetTime(), ImVec2(0.0f, 0.0f), "Loading...");
+            // ImGui::Text("Loading %c", "|/-\\"[(int)(ImGui::GetTime() / 0.05f) & 3]);
         }
         else if (hasTexture)
         {
@@ -191,12 +192,17 @@ namespace ImageProcessor
             glBindTexture(GL_TEXTURE_2D, inputPhotoTexture);
 
             textureShader->setInt("uTexture", 0);                           // Set texture unit to 0
-            textureShader->setFloat("uHighlightFactor", currentBrightness); // Pass the brightness value
+            textureShader->setFloat("uHighlightFactor", currentHighlights); // Pass the highlights value
+            textureShader->setFloat("uShadowsFactor", currentShadows);      // Pass the shadows value
+            textureShader->setFloat("uContrast", currentContrast);          // Pass the shadows value
+            textureShader->setFloat("uExposure", currentExposure);          // Pass the expsoure value
+            textureShader->setFloat("uSaturation", currentSaturation);      // Pass the saturation value
 
-            textureShader->setFloat("fs", fs); // Pass the brightness value
-            textureShader->setFloat("ls", ls); // Pass the brightness value
+            textureShader->setFloat("shadowLowThreshold", shadowLow);           //
+            textureShader->setFloat("shadowHighThreshold", shadowHigh);         //
 
-            // textureShader->setFloat("uShadowLift", currentShadows); // Pass the brightness value
+            textureShader->setFloat("highlightsLowThreshold", hightlightLow);   //
+            textureShader->setFloat("highlightsHighThreshold", hightlightHigh); //
 
             glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0); // 6 indices for 2 triangles
 
@@ -332,34 +338,58 @@ namespace ImageProcessor
             panningOffset.y += offsetChange.y;
         }
     }
-
+    // image controls
     // Set Zoom Value
     void ImageViewer::setZoom(float newZoom)
     {
         // Clamp to safe range
         imageZoom = std::clamp(newZoom, 0.1f, 10.0f);
     }
-
-    void ImageViewer::setBrightness(float newBrigthnessVal)
+    // image modifications
+    void ImageViewer::setHighlights(float newHighlightVal)
     {
         // Clamp to safe range
-        currentBrightness = std::clamp(newBrigthnessVal, -1.0f, 2.0f);
+        currentHighlights = std::clamp(newHighlightVal, -1.0f, 2.0f);
     }
     void ImageViewer::setShadows(float newShadowVal)
     {
         // Clamp to safe range
-        currentShadows = std::clamp(newShadowVal, -1.0f, 1.0f);
+        currentShadows = std::clamp(newShadowVal, -1.0f, 2.0f);
     }
-
-    void ImageViewer::setfs(float newFs)
+    void ImageViewer::setExposure(float newExposureVal)
     {
-        // Clamp to safe range
-        fs = newFs;
+        // TODO: Clamp to safe range
+        currentExposure = newExposureVal;
     }
-
-    void ImageViewer::setls(float newLs)
+    void ImageViewer::setSaturation(float newSaturationVal)
     {
-        // Clamp to safe range
-        ls = newLs;
+        // TODO: Clamp to safe range
+        currentSaturation = newSaturationVal;
+    }
+    void ImageViewer::setContrast(float newContrastVal)
+    {
+        // TODO: Clamp to safe range
+        currentContrast = newContrastVal;
+    }
+    // temp
+    void ImageViewer::setShadowLow(float newShadowLow)
+    {
+        // TODO: Clamp to safe range
+        shadowLow = newShadowLow;
+    }
+    void ImageViewer::setShadowHigh(float newShadowHigh)
+    {
+        // TODO: Clamp to safe range
+        shadowHigh = newShadowHigh;
+    }
+    void ImageViewer::setHighlightsLow(float newHighlightsHigh)
+    {
+        // TODO: Clamp to safe range
+        hightlightLow = newHighlightsHigh;
+    }
+    void ImageViewer::setHighlightsHigh(float newHighlightsHigh)
+    {
+        // TODO: Clamp to safe range
+        hightlightHigh = newHighlightsHigh;
     }
 }

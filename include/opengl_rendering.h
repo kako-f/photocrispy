@@ -15,7 +15,7 @@ namespace OpenGlRendering
     {
     private:
         unsigned int textureColorBuffer;
-        unsigned int FBO, VAO, VBO, RBO;
+        unsigned int FBO, VAO, VBO, RBO, EBO;
         PhotoShader *textureShader = nullptr;
 
     public:

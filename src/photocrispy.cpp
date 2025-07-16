@@ -47,6 +47,7 @@ namespace PhotoCrispy
     {
         // Clean up any resources held by the class if necessary
         triangleRender.triangleCleanup();
+        imageViewport.photoOpenglCleanup();
         fmt::print("PhotoCrispyApp shutting down.\n");
     }
     void PhotoCrispyApp::renderUI()
@@ -58,7 +59,7 @@ namespace PhotoCrispy
         RenderImagePreviewPanel();
         RenderRightInfoPanel();
 
-        // ImGui::ShowDemoWindow();
+        ImGui::ShowDemoWindow();
         ImGui::ShowMetricsWindow();
     }
 
@@ -248,25 +249,67 @@ namespace PhotoCrispy
         }
         if (rawInfo.success)
         {
+            ImGui::SeparatorText("Balance/Tint");
+            ImGui::SeparatorText("Tone");
             // we need to reset the values when loading a new pict
-            float currentPhotoBrightness = imageViewport.getBrightness();
-            if (ImGui::SliderFloat("Exposure", &currentPhotoBrightness, -1.0f, 2.0f, "%.4f"))
+            float currentExposure = imageViewport.getExposure();
+            if (ImGui::SliderFloat("Exposure", &currentExposure, -4.0f, 4.0f, "%.4f"))
             {
                 // update class value if slider changed
-                imageViewport.setBrightness(currentPhotoBrightness);
+                imageViewport.setExposure(currentExposure);
             }
-
-            float currentFs = imageViewport.getFs();
-            if (ImGui::SliderFloat("top Shadows", &currentFs, -1.0f, 1.0f, "%.3f"))
+            float currentContrast = imageViewport.getContrast();
+            if (ImGui::SliderFloat("Contrast", &currentContrast, -1.0f, 1.0f, "%.4f"))
             {
-                // update class value if slider changed
-                imageViewport.setfs(currentFs);
+                imageViewport.setContrast(currentContrast);
             }
-            float currentLs = imageViewport.getLs();
-            if (ImGui::SliderFloat("low Shadows", &currentLs, -1.0f, 1.0f, "%.3f"))
+            ImGui::Separator();
+            float currentHighlights = imageViewport.getHighlights();
+            if (ImGui::SliderFloat("Highlights", &currentHighlights, -1.0f, 2.0f, "%.4f"))
             {
                 // update class value if slider changed
-                imageViewport.setls(currentLs);
+                imageViewport.setHighlights(currentHighlights);
+            }
+            float currentShadows = imageViewport.getShadows();
+            if (ImGui::SliderFloat("Shadows", &currentShadows, -1.0f, 2.0f, "%.4f"))
+            {
+                // update class value if slider changed
+                imageViewport.setShadows(currentShadows);
+            }
+            ImGui::SeparatorText("Color");
+            float currentSaturation = imageViewport.getSaturation();
+            if (ImGui::SliderFloat("Saturation", &currentSaturation, -1.0f, 1.0f, "%.3f"))
+            {
+                // update class value if slider changed
+                imageViewport.setSaturation(currentSaturation);
+            }
+            ImGui::Separator();
+            float pstep = 0.005f;
+            float fstep = 0.05f;
+            float currentShadowLow = imageViewport.getShadowLow();
+            float currentShadowHigh = imageViewport.getShadowHigh();
+            static float shadowThresh[2] = {currentShadowLow, currentShadowHigh};
+            if (ImGui::InputScalarN("Shadows High/Low Falloff", ImGuiDataType_Float, shadowThresh, 2, &pstep, &fstep, "%.3f"))
+            {
+                currentShadowLow = shadowThresh[0];
+                currentShadowHigh = shadowThresh[1];
+                imageViewport.setShadowLow(currentShadowLow);
+                imageViewport.setShadowHigh(currentShadowHigh);
+            }
+            ImGui::Separator();
+            float currentHighlightsLow = imageViewport.getHighlightsLow();
+            float currentHighlightsHigh = imageViewport.getHighlightsHigh();
+            static float highlightThresh[2] = {currentHighlightsLow, currentHighlightsHigh};
+            if (ImGui::InputScalarN("Highlights High/Low Falloff", ImGuiDataType_Float, highlightThresh, 2, &pstep, &fstep, "%.3f"))
+            {
+                currentHighlightsLow = highlightThresh[0];
+                currentHighlightsHigh = highlightThresh[1];
+                imageViewport.setHighlightsLow(currentHighlightsLow);
+                imageViewport.setHighlightsHigh(currentHighlightsHigh);
+            }
+            if (ImGui::Button("Reset"))
+            {
+                imageViewport.resetImageModifications();
             }
         }
 

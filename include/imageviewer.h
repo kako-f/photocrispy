@@ -33,44 +33,63 @@ namespace ImageProcessor
         PhotoShader *textureShader = nullptr;
 
         // image modifications params
-        float currentBrightness = 1.0f; // Initial brightness
-        float currentShadows = 1.0f; // Initial brightness
-        float currentExposure = 1.0f;
-        float currentSaturation = 1.0f;
+        float currentHighlights = 1.0f; // Initial brightness
+        float currentShadows = 1.0f;
+        float currentContrast = 0.0f;
+        float currentExposure = 0.0f;
+        float currentSaturation = 0.0f;
 
-        float fs = 1.0;
-        float ls = 1.0;
+        // temp
+        float shadowLow = 0.5f;
+        float shadowHigh = 0.2f;
 
+        float hightlightLow = 0.2f;
+        float hightlightHigh = 0.5f;
         bool hasTexture = false;
 
     public:
+        // Mouse / keyboard Inputs
         void handleInput(const ImVec2 &imageSize, const ImVec2 &panelSize, const ImVec2 &imagePos);
 
+        // opengl Texture
         void photopenglInit();
-
         bool photoFBO(float width, float height);
-
         void rescaleFBO(float width, float height);
-
-        unsigned int photoOpenglGetTexture() const { return inputPhotoTexture; }
-
         void photoOpenglCleanup();
+        bool loadImage2(const RawProcessor::RawImageInfo &imageInfo);
+        void render3(const ThreadLoader::ThreadedImageLoader &imageLoader);
+        void checkGLError(const std::string &step);
 
+        // Image controls and modifications
         float getZoom() const { return imageZoom; }
-        float getBrightness() const { return currentBrightness; }
-        float getShadows() const { return currentShadows; }
-        
-        float getLs() const { return ls; }
-        float getFs() const { return fs; }
-
-        bool getIfTexture() const { return hasTexture; }
-
         void setZoom(float newZoom);
-        void setBrightness(float newBrightnessVal);
-        void setShadows(float newShadowVal);
 
-        void setfs(float newFs);
-        void setls(float newLs);
+        // Modifications
+        void setHighlights(float newBrightnessVal);
+        float getHighlights() const { return currentHighlights; }
+
+        void setSaturation(float newSaturationValue);
+        float getSaturation() const { return currentSaturation; }
+
+        void setShadows(float newShadowVal);
+        float getShadows() const { return currentShadows; }
+
+        void setExposure(float newExposureVal);
+        float getExposure() const { return currentExposure; }
+
+        void setContrast(float newContrastVal);
+        float getContrast() const { return currentContrast; }
+
+        // temporal
+        void setShadowLow(float newShadowLow);
+        void setShadowHigh(float newShadowHigh);
+        float getShadowLow() const { return shadowLow; }
+        float getShadowHigh() const { return shadowHigh; }
+
+        void setHighlightsLow(float newHighlightLow);
+        void setHighlightsHigh(float newHighlightHigh);
+        float getHighlightsLow() const { return hightlightLow; }
+        float getHighlightsHigh() const { return hightlightHigh; }
 
         void resetView()
         {
@@ -80,14 +99,17 @@ namespace ImageProcessor
 
         void resetImageModifications()
         {
-            currentBrightness = 1.0f;
+            currentHighlights = 1.0f;
+            currentShadows = 1.0f;
+            currentContrast = 0.0f;
+            currentExposure = 0.0f;
+            currentSaturation = 0.0f;
+
+            shadowLow = 0.5f;
+            shadowHigh = 0.2f;
+            hightlightLow = 0.2f;
+            hightlightHigh = 0.5f;
         }
-
-        bool loadImage2(const RawProcessor::RawImageInfo &imageInfo);
-
-        void render3(const ThreadLoader::ThreadedImageLoader &imageLoader);
-
-        void checkGLError(const std::string &step);
     };
 
 }
