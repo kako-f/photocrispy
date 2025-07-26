@@ -1,0 +1,45 @@
+#version 430 core // Use a modern GLSL version for compute shaders and atomics
+
+layout(local_size_x = 4, local_size_y = 4, local_size_z = 1) in; // Work group size, adjust as needed
+layout(rgba16, binding = 0) uniform image2D editedImage; // Your edited image texture
+layout(std430, binding = 1) buffer histSSBO { // SSBO for histogram
+    uint histogramBins[]; // Array of unsigned integers
+};
+
+const int numBinsHist = 128; // Must match C++
+const int numBinsChannel = numBinsHist; // For clarity
+
+void main()
+{
+    // ivec = integer vector
+    // vec = float vector
+    ivec2 pixelCoords = ivec2(gl_GlobalInvocationID.xy);
+    ivec2 imageSize = imageSize(editedImage);
+
+    if (pixelCoords.x >= imageSize.x || pixelCoords.y >= imageSize.y) {
+        return; // Ensure we don't go out of bounds
+    }
+
+    vec4 color = imageLoad(editedImage, pixelCoords);
+    // Quantize and increment bins for R, G, B
+    uint r_bin = uint(color.r * (numBinsChannel - 1));
+    uint g_bin = uint(color.g * (numBinsChannel - 1));
+    uint b_bin = uint(color.b * (numBinsChannel - 1));
+
+    // Atomic increments
+    // Red channel: 0 to numBinsHist-1
+    atomicAdd(histogramBins[r_bin], 1u);
+    // Green channel: numBinsHist to 2*numBinsHist-1
+    atomicAdd(histogramBins[g_bin + numBinsChannel], 1u);
+    // Blue channel: 2*numBinsHist to 3*numBinsHist-1
+    atomicAdd(histogramBins[b_bin + 2 * numBinsChannel], 1u);
+
+    // Calculate Luminance (Rec. 709 Luma)
+    float luminance = dot(color.rgb, vec3(0.2126, 0.7152, 0.0722));
+    uint l_bin = uint(luminance * (numBinsChannel - 1));
+    l_bin = min(l_bin, uint(numBinsChannel - 1));
+
+    // Luminance channel: 3*NUM_HIST_BINS to 4*NUM_HIST_BINS-1
+    atomicAdd(histogramBins[l_bin + 3 * numBinsChannel], 1u);
+
+}

@@ -15,6 +15,9 @@ To the date (July 2025) the program looks like this.
 * To implement HSL and HSV [wikipedia](https://en.wikipedia.org/wiki/HSL_and_HSV).
 * More...
 
+# Builds
+
+For the moment, the only build "available" is on Windows. Im using CMake, so it's possible to compile and build in another Windows system. 
 
 # Usefull links
 * https://thebookofshaders.com/

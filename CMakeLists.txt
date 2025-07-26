@@ -42,6 +42,7 @@ add_executable(photoraw
         src/opengl_rendering.cpp
         src/opengl_shader.cpp
         src/opengl_framebuffer.cpp
+        src/opengl_compute_shader.cpp
         )
 
 target_link_libraries(photoraw

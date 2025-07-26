@@ -21,9 +21,9 @@ namespace OpenGlRendering
     public:
         void openglInit();
 
-        bool triangleInit(float texWidth, float texHeight);
-        void triangleRender(const float width, const float height);
-        void rescaleFBO(float width, float height);
+        bool triangleInit(int texWidth, int texHeight);
+        void triangleRender(int width, int height);
+        void rescaleFBO(int width, int height);
 
         unsigned int triangleGetTexture() const { return textureColorBuffer; }
         void triangleCleanup();

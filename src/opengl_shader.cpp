@@ -1,6 +1,5 @@
 #include "opengl_shader.h"
 
-
 PhotoShader::PhotoShader(const char *vertexPath, const char *fragmentPath)
 {
     // 1. Retrieve the vertex/fragment source code from filePath

@@ -26,6 +26,7 @@ namespace RawProcessor
         std::string lens_aperture;
 
         std::vector<unsigned char> data;
+        //std::vector<unsigned short> data;
         unsigned char *jpgdata;
     };
 

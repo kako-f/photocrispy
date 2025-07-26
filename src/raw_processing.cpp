@@ -17,12 +17,20 @@ namespace RawProcessor
             fmt::print(stderr, "Error opening {}: {}\n", raw_image_filepath, libraw_strerror(ret));
             return result;
         }
-        // RAW Processing params.
-        // to modify further.
-        photoRawProcessor.imgdata.params.no_auto_bright = 1; // No auto brightness
-        photoRawProcessor.imgdata.params.user_qual = 0;      // Fastest demosaic (linear)
-        photoRawProcessor.imgdata.params.use_camera_wb = 1;       // No gamma correction
-        photoRawProcessor.imgdata.params.use_camera_matrix = 0; // color profile
+        // --- LibRaw Processing Params - Linear High-Bit-Depth Output ---
+        // to modify further. 1 enabled 0 disabled -- unless otherwise
+        photoRawProcessor.imgdata.params.no_auto_bright = 1;    // Keep manual control over brightness
+        photoRawProcessor.imgdata.params.user_qual = 0;         // Fastest demosaic, often fine for speed, but quality might vary.
+                                                                // Consider `1` for VNG, `2` for AHD if quality is paramount.
+        photoRawProcessor.imgdata.params.use_camera_wb = 0;     // Use camera's white balance (recommended)
+        photoRawProcessor.imgdata.params.use_camera_matrix = 1; // Use camera's color profile (CRITICAL for correct colors)
+
+        // --- Testing: Set output format to 16-bit linear ---
+        photoRawProcessor.imgdata.params.output_bps = 16;  // Output 16 bits per sample
+/*         photoRawProcessor.imgdata.params.gamm[0] = 1.0;    // Linear gamma (no gamma curve)
+        photoRawProcessor.imgdata.params.gamm[1] = 1.0;    // Linear gamma (no gamma curve) */
+        photoRawProcessor.imgdata.params.output_color = 1; // Output in sRGB color space (linear primaries)
+                                                           // 0 for raw camera space, 1 for sRGB, 2 for Adobe, 3 for WideGamut, 4 for ProPhoto
 
         // unpacking the data
         if (ret = photoRawProcessor.unpack() != LIBRAW_SUCCESS)
@@ -60,11 +68,21 @@ namespace RawProcessor
             result.cam_make = photoRawProcessor.imgdata.idata.normalized_make;
             result.cam_model = photoRawProcessor.imgdata.idata.normalized_model;
             result.lens_model = photoRawProcessor.imgdata.lens.Lens;
-            // Copy pixel data
-            size_t size = image->width * image->height * image->colors;
 
-            result.data = std::vector<unsigned char>(image->data, image->data + size);
+            // size_t size = image->width * image->height * image->colors;
+            
+            // Copy pixel data          
+            // For 16-bit data, size is width * height * colors * (bits / 8)
+            size_t bytes_per_pixel = image->colors * (image->bits / 8);
+            size_t total_bytes = image->width * image->height * bytes_per_pixel;
 
+            // result.data = std::vector<unsigned char>(image->data, image->data + size);
+            
+            // Ensure result.data can hold 16-bit data (unsigned char is fine, but you'll treat it as unsigned short)
+            // If you want to store as std::vector<unsigned short>, change RawImageInfo.data type.
+            // For now, let's assume you'll cast it to unsigned short when passing to OpenGL.
+            result.data.assign(image->data, image->data + total_bytes);
+            fmt::print("{} bits\n" ,photoRawProcessor.imgdata.params.output_bps);
             // clearing memory and recycling
             photoRawProcessor.dcraw_clear_mem(image);
             photoRawProcessor.recycle();

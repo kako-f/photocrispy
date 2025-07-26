@@ -2,29 +2,6 @@
 
 namespace ImageProcessor
 {
-    void ImageViewer::photoOpenglCleanup()
-    {
-        glDeleteFramebuffers(1, &FBO);
-        glDeleteTextures(1, &outputPhotoTexture);
-        glDeleteRenderbuffers(1, &EBO);
-        glDeleteVertexArrays(1, &VAO);
-        glDeleteBuffers(1, &VBO);
-        glDeleteProgram(textureShader->ID);
-    }
-
-    void ImageViewer::rescaleFBO(float width, float height)
-    {
-        glBindTexture(GL_TEXTURE_2D, outputPhotoTexture);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, (GLsizei)width, (GLsizei)height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, outputPhotoTexture, 0);
-
-        glBindRenderbuffer(GL_RENDERBUFFER, EBO);
-        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, (GLsizei)width, (GLsizei)height);
-        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, EBO);
-    }
-
     // Helper to check for OpenGL errors
     void ImageViewer::checkGLError(const std::string &step)
     {
@@ -35,6 +12,29 @@ namespace ImageProcessor
         }
     }
 
+    void ImageViewer::photoOpenglCleanup()
+    {
+        glDeleteFramebuffers(1, &FBO);
+        glDeleteTextures(1, &outputPhotoTexture);
+        glDeleteRenderbuffers(1, &EBO);
+        glDeleteVertexArrays(1, &VAO);
+        glDeleteBuffers(1, &VBO);
+        glDeleteProgram(textureShader->ID);
+    }
+
+    void ImageViewer::rescaleFBO(int width, int height)
+    {
+        glBindTexture(GL_TEXTURE_2D, outputPhotoTexture);
+        // glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, (GLsizei)width, (GLsizei)height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16, (GLsizei)width, (GLsizei)height, 0, GL_RGB, GL_UNSIGNED_SHORT, nullptr);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, outputPhotoTexture, 0);
+
+        glBindRenderbuffer(GL_RENDERBUFFER, EBO);
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, (GLsizei)width, (GLsizei)height);
+        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, EBO);
+    }
     void ImageViewer::photopenglInit()
     {
         float vertices[] = {
@@ -52,7 +52,6 @@ namespace ImageProcessor
 
         glGenVertexArrays(1, &VAO);
         glGenBuffers(1, &VBO);
-        glGenBuffers(1, &EBO);
         checkGLError("Gen Buffers");
 
         glBindVertexArray(VAO);
@@ -84,25 +83,95 @@ namespace ImageProcessor
         glBindBuffer(GL_ARRAY_BUFFER, 0);
         glBindVertexArray(0);
         checkGLError("Unbind Buffers");
+
         textureShader = new PhotoShader("../../include/shaders/photo.vert", "../../include/shaders/photo.frag");
 
-        checkGLError("Shader Creation");
+        checkGLError("Shader Creation\n");
     }
 
-    bool ImageViewer::photoFBO(float width, float height)
+    // --- Histogram functions ---
+
+    void ImageViewer::photoHistogram()
+    {
+        glGenBuffers(1, &histSSBO);
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, histSSBO);
+        glBufferData(GL_SHADER_STORAGE_BUFFER, histBufferSizeBytes, nullptr, GL_DYNAMIC_COPY);
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0); // Unbind
+        checkGLError("SSBO binding\n");
+
+        histogramShader = new ComputeShader("../../include/shaders/histogram.comp");
+        checkGLError("Compute Shader Creation\n");
+
+        cpuHistogramData.resize(binNum * 4);
+    }
+
+    void ImageViewer::computeHistogram(GLuint editedPhotoTextureID, int imageWidth, int imageHeight)
     {
 
+        histogramShader->use();
+        // 1. Clear the SSBO
+        // Bind the SSBO
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, histSSBO);
+        // Fill with zeros. Use glClearBufferSubData or glBufferSubData with a zero array.
+        // glClearBufferSubData is more efficient if available (OpenGL 4.3+)
+        glClearBufferData(GL_SHADER_STORAGE_BUFFER, GL_R32UI, GL_RED, GL_UNSIGNED_INT, nullptr);
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0); // Unbind
+
+        // 2. Bind the edited image texture to image unit 0
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, editedPhotoTextureID);
+        // Bind it as an image for imageLoad/imageStore
+        // level 0, layered false, layer 0 (not a texture array), read/write
+        glBindImageTexture(0, editedPhotoTextureID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA16); // Match shader layout
+
+        // 3. Bind the SSBO to binding point 1
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, histSSBO);
+        // 4. Dispatch the compute shader
+        // Calculate dispatch groups based on image size and local_size_x/y
+        // local_size_x = 16, local_size_y = 16 from shader
+        int numGroupsX = (imageWidth + 3) / 4;
+        int numGroupsY = (imageHeight + 3) / 4;
+        glDispatchCompute(numGroupsX, numGroupsY, 1);
+        /*         fmt::print("{} {}\n", numGroupsX, numGroupsY);
+         */
+        // 5. Ensure all writes to the SSBO are complete before reading (if reading back to CPU)
+        glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+
+        // Clean up
+        glBindImageTexture(0, 0, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA16);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, 0); // Unbind SSBO from binding point
+        histogramShader->unbind();
+    }
+
+    void ImageViewer::readHistogramData()
+    {
+        // 1. Bind the SSBO
+        // Make sure the correct SSBO is bound before attempting to read from it.
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, histSSBO);
+        glGetBufferSubData(
+            GL_SHADER_STORAGE_BUFFER,
+            0,                           // Start from the beginning of the buffer
+            sizeof(GLuint) * binNum * 4, // Total size for R,G,B,L channels
+            cpuHistogramData.data()      // Pointer to the raw data of your std::vector
+        );
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+    }
+    // ---
+
+    bool ImageViewer::photoFBO(int width, int height)
+    {
         glGenFramebuffers(1, &FBO);
         glBindFramebuffer(GL_FRAMEBUFFER, FBO);
 
         glGenTextures(1, &outputPhotoTexture);
         glBindTexture(GL_TEXTURE_2D, outputPhotoTexture);
 
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, (GLsizei)width, (GLsizei)height, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr);
+        // glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, (GLsizei)width, (GLsizei)height, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16, (GLsizei)width, (GLsizei)height, 0, GL_RGB, GL_UNSIGNED_SHORT, nullptr);
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, outputPhotoTexture, 0);
 
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
         glGenRenderbuffers(1, &EBO);
         glBindRenderbuffer(GL_RENDERBUFFER, EBO);
@@ -113,9 +182,6 @@ namespace ImageProcessor
             fmt::print("ERROR::FRAMEBUFFER:: Framebuffer is not complete!\n");
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        // glBindTexture(GL_TEXTURE_2D, 0);
-
-        /*         glBindRenderbuffer(GL_RENDERBUFFER, 0); */
 
         photopenglInit();
 
@@ -132,24 +198,22 @@ namespace ImageProcessor
         imageZoom = 1.0f;
         panningOffset = ImVec2(0, 0);
 
-        const unsigned char *data = imageInfo.data.data();
+        // const unsigned char *data = imageInfo.data.data();
+        const void *data = imageInfo.data.data();
 
-        GLenum format = GL_RGB;
-        if (imageBits == 1)
-            format = GL_RED;
-        else if (imageBits == 3)
-            format = GL_RGB;
-        else if (imageBits == 4)
-            format = GL_RGBA;
+        fmt::print("Image has {} bits of data. {} colors \n", imageBits, imageColors);
+        fmt::print("Image width {} height {} \n", imageWidth, imageHeight);
 
         glGenTextures(1, &inputPhotoTexture);
         glBindTexture(GL_TEXTURE_2D, inputPhotoTexture);
-        glTexImage2D(GL_TEXTURE_2D, 0, format, imageWidth, imageHeight, 0, format, GL_UNSIGNED_BYTE, data);
-        // Setup filtering parameters for display
+        // glTexImage2D(GL_TEXTURE_2D, 0, format, imageWidth, imageWidth, 0, format, GL_UNSIGNED_BYTE, data);
+        // 16 bits data from raw image
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16, imageWidth, imageHeight, 0, GL_RGB, GL_UNSIGNED_SHORT, data);
+        // Setup filtering parameters for displayR
         // GL_NEAREST / More pixelated "zoomed" image.
         // GL_LINEAR / smoothed max zoom, less pixels
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
         hasTexture = true;
 
@@ -174,18 +238,29 @@ namespace ImageProcessor
         }
         else if (imageLoader.isLoading())
         {
-            ImGui::ProgressBar(-1.0f * (float)ImGui::GetTime(), ImVec2(0.0f, 0.0f), "Loading...");
-            // ImGui::Text("Loading %c", "|/-\\"[(int)(ImGui::GetTime() / 0.05f) & 3]);
+            // Loading text in the middle
+            const char *label = "Loading...";
+            ImVec2 window_size = ImGui::GetWindowSize();
+            float button_width = ImGui::CalcTextSize(label).x + ImGui::GetStyle().FramePadding.x * 2.0f;
+            float button_height = ImGui::GetFrameHeight();
+
+            float target_x = (window_size.x - button_width) * 0.5f;
+            float target_y = (window_size.y - button_height) * 0.5f;
+
+            ImGui::SetCursorPos(ImVec2(target_x, target_y));
+
+            // ImGui::ProgressBar(-1.0f * (float)ImGui::GetTime(), ImVec2(0.0f, 0.0f), label);
+            ImGui::Text("Loading %c", "|/-\\"[(int)(ImGui::GetTime() / 0.05f) & 3]);
         }
         else if (hasTexture)
         {
             glBindFramebuffer(GL_FRAMEBUFFER, FBO);
-            rescaleFBO((float)imageWidth, (float)imageHeight);
-
-            glViewport(0, 0, (GLsizei)imageWidth, (GLsizei)imageHeight);
-            glClear(GL_COLOR_BUFFER_BIT);
+            rescaleFBO(imageWidth, imageHeight);
+            glViewport(0, 0, imageWidth, imageHeight);
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
             textureShader->use();
+
             glBindVertexArray(VAO);
 
             glActiveTexture(GL_TEXTURE0); // Activate texture unit 0
@@ -193,20 +268,20 @@ namespace ImageProcessor
 
             textureShader->setInt("uTexture", 0);                           // Set texture unit to 0
             textureShader->setFloat("uHighlightFactor", currentHighlights); // Pass the highlights value
-            textureShader->setFloat("uShadowsFactor", currentShadows);      // Pass the shadows value
+            textureShader->setFloat("uShadowFactor", currentShadows);       // Pass the shadows value
             textureShader->setFloat("uContrast", currentContrast);          // Pass the shadows value
             textureShader->setFloat("uExposure", currentExposure);          // Pass the expsoure value
             textureShader->setFloat("uSaturation", currentSaturation);      // Pass the saturation value
 
-            textureShader->setFloat("shadowLowThreshold", shadowLow);           //
-            textureShader->setFloat("shadowHighThreshold", shadowHigh);         //
+            textureShader->setFloat("uShadowCutoffLum", shadowLow); //
+            textureShader->setFloat("uShadowFullLum", shadowHigh);  //
 
-            textureShader->setFloat("highlightsLowThreshold", hightlightLow);   //
-            textureShader->setFloat("highlightsHighThreshold", hightlightHigh); //
+            textureShader->setFloat("uHighlightLowLum", hightlightLow);   //
+            textureShader->setFloat("uHighlightHighLum", hightlightHigh); //
 
+            // Rendering of edited image to FBO texture
             glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0); // 6 indices for 2 triangles
-
-            glBindFramebuffer(GL_FRAMEBUFFER, 0); // back to screen
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);                // back to screen
 
             // Size of the current panel and position (coordinates) of the currentWindow
             ImVec2 avail = ImGui::GetContentRegionAvail();
@@ -248,10 +323,15 @@ namespace ImageProcessor
 
             ImGui::Image((ImTextureID)(intptr_t)outputPhotoTexture, ImVec2(drawWidth, drawHeight));
             handleInput(ImVec2(drawWidth, drawHeight), avail, centeredPos);
+            
+            computeHistogram(outputPhotoTexture, imageWidth, imageHeight);
+            readHistogramData();
+
         }
 
         ImGui::End();
     }
+
     // Function to handle inputs to the image.
     // Panning and reset panning and zoom
     // imageSize = Width and Height (vector)
@@ -338,6 +418,7 @@ namespace ImageProcessor
             panningOffset.y += offsetChange.y;
         }
     }
+
     // image controls
     // Set Zoom Value
     void ImageViewer::setZoom(float newZoom)

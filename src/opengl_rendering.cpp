@@ -37,12 +37,12 @@ namespace OpenGlRendering
                 }; */
 
         float vertices[] = {
-            // positions          // colors          
-            0.5f,  0.5f, 0.0f,   1.0f, 0.0f, 0.0f,  // top right
-            0.5f, -0.5f, 0.0f,   0.0f, 1.0f, 0.0f,  // bottom right
-            -0.5f, -0.5f, 0.0f,   0.0f, 0.0f, 1.0f,  // bottom left
-            -0.5f,  0.5f, 0.0f,   1.0f, 1.0f, 0.0f,  // top left 
-        }; 
+            // positions          // colors
+            0.5f, 0.5f, 0.0f, 1.0f, 0.0f, 0.0f,   // top right
+            0.5f, -0.5f, 0.0f, 0.0f, 1.0f, 0.0f,  // bottom right
+            -0.5f, -0.5f, 0.0f, 0.0f, 0.0f, 1.0f, // bottom left
+            -0.5f, 0.5f, 0.0f, 1.0f, 1.0f, 0.0f,  // top left
+        };
         unsigned int indices[] = {
             // note that we start from 0!
             0, 1, 3, // first triangle
@@ -85,9 +85,9 @@ namespace OpenGlRendering
         glEnableVertexAttribArray(1);
 
         // note that this is allowed, the call to glVertexAttribPointer registered VBO as the vertex attribute's bound vertex buffer object so afterwards we can safely unbind
-        //glBindBuffer(GL_ARRAY_BUFFER, 0);
+        // glBindBuffer(GL_ARRAY_BUFFER, 0);
     }
-    void TriangleRendering::rescaleFBO(float width, float height)
+    void TriangleRendering::rescaleFBO(int width, int height)
     {
         glBindTexture(GL_TEXTURE_2D, textureColorBuffer);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, (GLsizei)width, (GLsizei)height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
@@ -100,7 +100,7 @@ namespace OpenGlRendering
         glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, RBO);
     }
 
-    bool TriangleRendering::triangleInit(float width, float height)
+    bool TriangleRendering::triangleInit(int width, int height)
     {
 
         glGenFramebuffers(1, &FBO);
@@ -133,7 +133,7 @@ namespace OpenGlRendering
         return true;
     }
 
-    void TriangleRendering::triangleRender(const float width, const float height)
+    void TriangleRendering::triangleRender(int width, int height)
     {
         // Bind FBO → render to texture
         glBindFramebuffer(GL_FRAMEBUFFER, FBO);
@@ -146,12 +146,13 @@ namespace OpenGlRendering
 
         // use the glProgram with the shaders
         textureShader->use();
-
+        float timeValue = (float)glfwGetTime();
+        glUniform1f(glGetUniformLocation(textureShader->ID, "u_time"), timeValue);
         // update the uniform color
-/*         float timeValue = (float)glfwGetTime();
-        float greenValue = sin(timeValue) / 2.0f + 0.5f;
-        int vertexColorLocation = glGetUniformLocation(textureShader->ID, "ourColor");
-        glUniform4f(vertexColorLocation, 0.0f, greenValue, 0.0f, 1.0f); */
+        /*         float timeValue = (float)glfwGetTime();
+                float greenValue = sin(timeValue) / 2.0f + 0.5f;
+                int vertexColorLocation = glGetUniformLocation(textureShader->ID, "ourColor");
+                glUniform4f(vertexColorLocation, 0.0f, greenValue, 0.0f, 1.0f); */
 
         glBindVertexArray(VAO);
         // GL_Triangles = opengl primitive.
@@ -159,7 +160,7 @@ namespace OpenGlRendering
 
         // glDrawArrays(GL_TRIANGLES, 0, 6);
         // glDrawElements to indicate we want to render the triangles from an index buffer.
-        
+
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
         glBindFramebuffer(GL_FRAMEBUFFER, 0); // back to screen
     }

@@ -37,9 +37,11 @@ namespace PhotoCrispy
         glfwGetFramebufferSize(window, &fb_width, &fb_height);
         // fmt::print("{} {}", fb_height, fb_width);
 
-        triangleRender.triangleInit((float)fb_height, (float)fb_width);
+        triangleRender.triangleInit(fb_height, fb_width);
 
-        imageViewport.photoFBO((float)fb_height, (float)fb_width);
+        imageViewport.photoFBO(fb_height, fb_width);
+
+        imageViewport.photoHistogram();
 
         fmt::print("PhotoCrispyApp initialized.\n");
     }
@@ -59,7 +61,7 @@ namespace PhotoCrispy
         RenderImagePreviewPanel();
         RenderRightInfoPanel();
 
-        ImGui::ShowDemoWindow();
+        // ImGui::ShowDemoWindow();
         ImGui::ShowMetricsWindow();
     }
 
@@ -131,7 +133,6 @@ namespace PhotoCrispy
         if (imageLoader.pollLoadResult(rawInfo))
         {
             shouldUpdateTexture = true;
-            loadHistogram = ImageUtils::calculateHistogram(rawInfo);
             needsHistogramUpdate = true;
         }
         if (noClose)
@@ -150,9 +151,8 @@ namespace PhotoCrispy
             const float window_width = ImGui::GetContentRegionAvail().x;
             const float window_height = ImGui::GetContentRegionAvail().y;
 
-            fmt::print("w: {}, h: {}\n", window_width, window_height);
             // Render triangle to FBO texture
-            triangleRender.triangleRender(window_width, window_height);
+            triangleRender.triangleRender((int)window_width, (int)window_height);
             ImGui::Text("Triangle rendered to FBO texture:");
             ImGui::Image(
                 (intptr_t)triangleRender.triangleGetTexture(),
@@ -196,21 +196,6 @@ namespace PhotoCrispy
 
     void PhotoCrispyApp::RenderImageViewPanel()
     {
-        /*         ImGui::Begin("Photo Window");
-
-                const float window_width = ImGui::GetContentRegionAvail().x;
-                const float window_height = ImGui::GetContentRegionAvail().y;
-
-                fmt::print("w: {}, h: {}\n", window_width, window_height);
-                // Render triangle to FBO texture
-                imageViewport.render2(window_height,window_height);
-                ImGui::Text("patito:");
-                ImGui::Image(
-                    (intptr_t)imageViewport.photoOpenglGetTexture(),
-                    ImVec2(window_width, window_height), ImVec2(0, 1), ImVec2(1, 0));
-
-                ImGui::End(); */
-
         // passing the member image loader
 
         if (rawInfo.success && shouldUpdateTexture)
@@ -224,29 +209,60 @@ namespace PhotoCrispy
 
     void PhotoCrispyApp::RenderRightInfoPanel()
     {
-        ImGui::Begin("rightInfo");
+        ImGui::Begin("Edits");
         if (rawInfo.success || needsHistogramUpdate)
         {
             // Reset the flag once the histogram is about to be rendered/updated
             needsHistogramUpdate = false;
+            std::vector<GLuint> histogramData = imageViewport.getHistogramData();
+            int numBins = imageViewport.getBinNum();
 
-            if (!loadHistogram.red.empty())
+            if (!histogramData.empty())
             {
-                float graph_width = ImGui::GetContentRegionAvail().x;
-                float graph_height = 125.0f;
+                // Find max value for normalization
+                GLuint rMaxVal = 0;
+                GLuint gMaxVal = 0;
+                GLuint bMaxVal = 0;
+                GLuint lMaxVal = 0;
 
-                ImageUtils::drawOverlayedHistogram(loadHistogram, graph_width, graph_height);
+                for (int i = 0; i < numBins; ++i)
+                {
+                    rMaxVal = std::max(rMaxVal, histogramData[i]);
+                    gMaxVal = std::max(gMaxVal, histogramData[i + numBins]);
+                    bMaxVal = std::max(bMaxVal, histogramData[i + 2 * numBins]);
+                    lMaxVal = std::max(lMaxVal, histogramData[i + 3 * numBins]);
+                }
 
-                // Optional: Add a legend or labels below the plot
-                ImGui::TextColored(ImVec4(1.0f, 1.0f, 1.0f, 1.0f), "L");
-                ImGui::SameLine();
-                ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "R");
-                ImGui::SameLine();
-                ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "G");
-                ImGui::SameLine();
-                ImGui::TextColored(ImVec4(0.0f, 0.0f, 1.0f, 1.0f), "B");
+                // Convert GLuint to float for ImGui::PlotLines
+                std::vector<float> rPlotData(numBins);
+                std::vector<float> gPlotData(numBins);
+                std::vector<float> bPlotData(numBins);
+                std::vector<float> lPlotData(numBins);
+                for (int i = 0; i < numBins; ++i)
+                {
+                    rPlotData[i] = (rMaxVal > 0) ? (float)histogramData[i] / rMaxVal : 0.0f;
+                    gPlotData[i] = (gMaxVal > 0) ? (float)histogramData[i + numBins] / gMaxVal : 0.0f;
+                    bPlotData[i] = (bMaxVal > 0) ? (float)histogramData[i + 2 * numBins] / bMaxVal : 0.0f;
+                    lPlotData[i] = (lMaxVal > 0) ? (float)histogramData[i + 3 * numBins] / lMaxVal : 0.0f;
+                }
+                ImGui::Text("Red Channel");
+                ImGui::PlotLines("##RedHist", rPlotData.data(), numBins, 0, nullptr, 0.0f, 1.0f, ImVec2(ImGui::GetContentRegionAvail().x, 80));
+
+                ImGui::Text("Green Channel");
+                ImGui::PlotLines("##GreenHist", gPlotData.data(), numBins, 0, nullptr, 0.0f, 1.0f, ImVec2(0, 80));
+
+                ImGui::Text("Blue Channel");
+                ImGui::PlotLines("##BlueHist", bPlotData.data(), numBins, 0, nullptr, 0.0f, 1.0f, ImVec2(0, 80));
+
+                ImGui::Text("Luminance");
+                ImGui::PlotLines("##LumHist", lPlotData.data(), numBins, 0, nullptr, 0.0f, 1.0f, ImVec2(0, 80));
+            }
+            else
+            {
+                ImGui::TextWrapped("Histogram data not available.");
             }
         }
+
         if (rawInfo.success)
         {
             ImGui::SeparatorText("Balance/Tint");

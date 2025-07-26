@@ -34,8 +34,6 @@ namespace OpenglFrameBuffer
         glDeleteRenderbuffers(1, &rbo);
     }
 
-
-
     void FrameBuffer::rescaleFBO(float width, float height)
     {
         glBindTexture(GL_TEXTURE_2D, texture);

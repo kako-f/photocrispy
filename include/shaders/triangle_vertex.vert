@@ -1,23 +1,15 @@
 #version 330 core
-layout (location = 0) in vec3 aPos;   // the position variable has attribute position 0
-layout (location = 1) in vec3 aColor; // the color variable has attribute position 1
-  
-out vec3 ourColor; // output a color to the fragment shader
 
-void main()
-{
-    gl_Position = vec4(aPos, 1.0);
-    ourColor = aColor; // set ourColor to the input color we got from the vertex data
-} 
+in vec2 position;
+out vec2 texCoords;
 
-/* #version 330 core
-layout (location = 0) in vec3 aPos;
-out vec4 vertexColor; // specify a color output to the fragment shader
-
-void main()
-{
-    gl_Position = vec4(aPos.x, aPos.y, aPos.z, 1.0);
-    vertexColor = vec4(0.5, 1.0, 0.0, 1.0); 
-    
+void main() {
+    texCoords = (position + 1.0) / 2.0; // map from [-1, 1] to [0, 1]
+    gl_Position = vec4(position, 0.0, 1.0);
 }
- */
+
+// The Vertex Shader is the programmable Shader stage in the rendering pipeline that handles the processing of individual vertices. 
+// Vertex shaders are fed Vertex Attribute data, as specified from a vertex array object by a drawing command. 
+// A vertex shader receives a single vertex from the vertex stream and generates a single vertex to the output vertex stream. 
+// There must be a 1:1 mapping from input vertices to output vertices. 
+// https://www.khronos.org/opengl/wiki/Vertex_Shader
