@@ -1,0 +1,12 @@
+{
+  "version": 8,
+  "configurePresets": [
+    {
+      "name": "vcpkg",
+      "binaryDir": "D:/Build/PhotoCrispy",
+      "cacheVariables": {
+        "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
+      }
+    }
+  ]
+}
