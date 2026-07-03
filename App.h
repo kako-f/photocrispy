@@ -11,19 +11,20 @@ std::ptional - to return a valor when its needed but if not, there's no problem
 */
 
 class App {
+
 public:
     bool init();
     void run();
     void shutdown();
 
 private:
-
+    std::string m_lastDir = "."; 
     void renderUI();
     void renderMenuBar();
     void renderDevelopPanel();
-    void renderToolPanel();
     void renderDockSpace();
     void photoViewer();
+    void registerSettingsHandler();
 
     GLFWwindow* m_window = nullptr;
     std::optional<RawImage> m_image;

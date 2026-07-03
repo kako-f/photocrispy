@@ -1,10 +1,9 @@
 #include "App.h"
 #include "imgui.h"
+#include "imgui_internal.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 #include "ImGuiFileDialog.h"
-#include <algorithm>
-#include <chrono>
 #include <iostream>
 
 bool App::init()
@@ -24,6 +23,7 @@ bool App::init()
 
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
+    registerSettingsHandler();
 
     ImGuiIO &io = ImGui::GetIO();
 
@@ -77,8 +77,27 @@ void App::renderUI()
     renderMenuBar();
     photoViewer();
     renderDevelopPanel();
-    renderToolPanel();
 }
+
+void App::registerSettingsHandler() {
+    ImGuiSettingsHandler IniHandler;
+    IniHandler.TypeName = "PhotoCrispy";
+    IniHandler.TypeHash = ImHashStr("PhotoCrispy");
+    IniHandler.UserData = this;
+    IniHandler.ReadOpenFn = [](ImGuiContext*, ImGuiSettingsHandler*, const char*) -> void* { return (void*)1; };
+    IniHandler.ReadLineFn = [](ImGuiContext*, ImGuiSettingsHandler* h, void*, const char* line) {
+        App* app = (App*)h->UserData;
+        char buf[512];
+        if (sscanf(line, "LastDir=%511[^\n]", buf) == 1)
+            app->m_lastDir = buf;
+    };
+    IniHandler.WriteAllFn = [](ImGuiContext*, ImGuiSettingsHandler* h, ImGuiTextBuffer* buf) {
+        App* app = (App*)h->UserData;
+        buf->appendf("[PhotoCrispy][Settings]\nLastDir=%s\n", app->m_lastDir.c_str());
+    };
+    ImGui::AddSettingsHandler(&IniHandler);
+}
+
 
 void App::renderMenuBar()
 {
@@ -91,22 +110,10 @@ void App::renderMenuBar()
                 /* handle open - ImguiFileDialog */
                 IGFD::FileDialogConfig config;
                 config.countSelectionMax = 1;
-                config.path = ".";
-                ImGuiFileDialog::Instance()->OpenDialog("ChooseFileDlgKey", "Choose File", ".ARW,.raw,.dng,.jpg", config);
+                config.path = m_lastDir;
+                ImGuiFileDialog::Instance()->OpenDialog("ChooseFileDlgKey", "Choose File", ".ARW,.raw,.dng,.RAF", config);
             }
 
-            if (ImGui::MenuItem("Export DNG"))
-            {
-                /* handle export */
-            }
-            ImGui::EndMenu();
-        }
-        if (ImGui::BeginMenu("Edit"))
-        {
-            if (ImGui::MenuItem("Undo", "Ctrl+Z"))
-            {
-                /* handle undo */
-            }
             ImGui::EndMenu();
         }
         ImGui::EndMainMenuBar();
@@ -119,7 +126,8 @@ void App::renderMenuBar()
         if (ImGuiFileDialog::Instance()->IsOk())
         { // action if OK
             std::string filePathName = ImGuiFileDialog::Instance()->GetFilePathName();
-            // std::string filePath = ImGuiFileDialog::Instance()->GetCurrentPath();
+            m_lastDir = ImGuiFileDialog::Instance()->GetCurrentPath();
+            ImGui::MarkIniSettingsDirty();
             // async call to decodeRawImage
             m_loadFuture = std::async(std::launch::async, decodeRawImage, filePathName);
             m_loading = true;
@@ -140,6 +148,8 @@ void App::renderDevelopPanel()
         ImGui::SameLine();
         if (ImGui::SmallButton("Reset"))
             m_zoom = 1.0f;
+        ImGui::TextDisabled("Enable zoom with Ctrl\nCtrl + Alt for precise zooming.");
+
     }
     ImGui::End();
     ImGui::Begin("Develop Settings");
@@ -150,20 +160,6 @@ void App::renderDevelopPanel()
     if (ImGui::Button("Export DNG"))
     {
         std::cout << "Exporting at exposure: " << m_exposure << std::endl;
-    }
-
-    ImGui::End();
-}
-
-void App::renderToolPanel()
-{
-    ImGui::Begin("Tools");
-    ImGui::Text("Tool Panel");
-    if (ImGui::Button("Tool 1"))
-    { /* ... */
-    }
-    if (ImGui::Button("Tool 2"))
-    { /* ... */
     }
 
     ImGui::End();
@@ -186,15 +182,15 @@ void App::photoViewer()
     // As imgui is constantly rendering, we ask if m_image has value.
     if (m_loading)
     {
-        ImGui::TextDisabled("Loading...");
+        ImVec2 region = ImGui::GetContentRegionAvail();
+        float barW = region.x * 0.5f;
+        ImGui::SetCursorPos(ImVec2((region.x - barW) * 0.5f, region.y * 0.5f));
+        ImGui::ProgressBar(-1.0f * (float)ImGui::GetTime(), ImVec2(barW, 0.0f), "Loading...");
     }
     else if (m_image.has_value())
     {
 
-        // actual canvas size
-        ImVec2 canvasSize = ImVec2(
-            ImGui::GetContentRegionAvail().x,
-            ImGui::GetContentRegionAvail().y);
+        ImVec2 canvasSize = ImGui::GetContentRegionAvail();
 
         // Compute fit-to-canvas size, then apply zoom
         float aspect = (float)m_image->width / (float)m_image->height;
@@ -208,21 +204,46 @@ void App::photoViewer()
 
         float w = fitW * m_zoom;
         float h = fitH * m_zoom;
-
+        // Center image only when it's smaller than the canvas
+        float offsetX = (w < canvasSize.x) ? (canvasSize.x - w) * 0.5f : 0.0f;
+        float offsetY = (h < canvasSize.y) ? (canvasSize.y - h) * 0.5f : 0.0f;
+        
         // Scrollable canvas
         ImGui::BeginChild("##canvas", canvasSize, false, ImGuiWindowFlags_HorizontalScrollbar);
 
         // Mouse wheel zooms while hovering the canvas
+        // Ctrl+scroll zooms to mouse; plain scroll pans (handled by ImGui)
         if (ImGui::IsWindowHovered())
         {
-            float wheel = ImGui::GetIO().MouseWheel;
-            if (wheel != 0.0f)
-                m_zoom = std::clamp(m_zoom + wheel * 0.1f, 0.1f, 8.0f);
+            ImGuiIO &io = ImGui::GetIO();
+            float wheel = io.MouseWheel;
+            if (wheel != 0.0f && io.KeyCtrl)
+            {
+                // Implementation of zoom where the mouse pointer is.
+                // Get current mouse position relative to the scrolling content
+                // ImGui::GetCursorScreenPos() marks the top-left of your drawing area
+                ImVec2 origin = ImGui::GetCursorScreenPos();
+                float mousePosX = io.MousePos.x - origin.x + ImGui::GetScrollX();
+                float mousePosY = io.MousePos.y - origin.y + ImGui::GetScrollY();
+                // Save the relative position (the "percentage" of the way across the image)
+                float relativeX = mousePosX / m_zoom;
+                float relativeY = mousePosY / m_zoom;
+
+                // Alt: fine zoom (1% per notch), default: 10% per notch
+                // TODO : Adjust via options.
+                float step = io.KeyAlt ? 0.01f : 0.1f;
+                m_zoom = std::clamp(m_zoom + (wheel * step), 0.1f, 8.0f);
+
+                ImGui::SetScrollX((relativeX * m_zoom) - (io.MousePos.x - origin.x));
+                ImGui::SetScrollY((relativeY * m_zoom) - (io.MousePos.y - origin.y));
+
+                // Prevent ImGui from also panning the child window on this frame
+                // without it a zoom event would also trigger ImGui's built-in
+                // scroll on the child window in the same frame.
+                io.MouseWheel = 0.0f;
+            }
         }
 
-        // Center image only when it's smaller than the canvas
-        float offsetX = (w < canvasSize.x) ? (canvasSize.x - w) * 0.5f : 0.0f;
-        float offsetY = (h < canvasSize.y) ? (canvasSize.y - h) * 0.5f : 0.0f;
         ImGui::SetCursorPos(ImVec2(offsetX, offsetY));
 
         ImGui::Image((ImTextureID)(uintptr_t)m_image->textureId, ImVec2(w, h));
@@ -244,14 +265,13 @@ void App::renderDockSpace()
     ImGui::SetNextWindowSize(viewport->Size);
     ImGui::SetNextWindowViewport(viewport->ID);
 
-    // Flags, options for docking space
-    // https://oprypin.github.io/crystal-imgui/ImGui/ImGuiWindowFlags.html
     ImGuiWindowFlags host_flags =
         ImGuiWindowFlags_NoCollapse |
         ImGuiWindowFlags_NoResize |
         ImGuiWindowFlags_NoMove |
         ImGuiWindowFlags_NoBringToFrontOnFocus |
         ImGuiWindowFlags_NoNavFocus |
+        ImGuiWindowFlags_HorizontalScrollbar |
         ImGuiWindowFlags_NoBackground;
 
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
