@@ -1,6 +1,7 @@
 #pragma once
 #include <future>
 #include <optional>
+#include <string>
 #include <GLFW/glfw3.h>
 #include "ImageLoader.h"
 
@@ -25,6 +26,7 @@ private:
     void renderDockSpace();
     void photoViewer();
     void registerSettingsHandler();
+    void clearImage();
 
     GLFWwindow* m_window = nullptr;
     std::optional<RawImage> m_image;

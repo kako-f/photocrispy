@@ -4,7 +4,11 @@
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 #include "ImGuiFileDialog.h"
-#include <iostream>
+#include "fmt/core.h"
+#include <algorithm>
+#include <chrono>
+#include <cstdint>
+#include <cstdio>
 
 bool App::init()
 {
@@ -62,6 +66,8 @@ void App::run()
 
 void App::shutdown()
 {
+    clearImage();
+
     // Destroying context and data freeing up memory
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
@@ -88,7 +94,7 @@ void App::registerSettingsHandler() {
     IniHandler.ReadLineFn = [](ImGuiContext*, ImGuiSettingsHandler* h, void*, const char* line) {
         App* app = (App*)h->UserData;
         char buf[512];
-        if (sscanf(line, "LastDir=%511[^\n]", buf) == 1)
+        if (sscanf_s(line, "LastDir=%511[^\n]", buf, (unsigned int)sizeof(buf)) == 1)
             app->m_lastDir = buf;
     };
     IniHandler.WriteAllFn = [](ImGuiContext*, ImGuiSettingsHandler* h, ImGuiTextBuffer* buf) {
@@ -159,7 +165,7 @@ void App::renderDevelopPanel()
 
     if (ImGui::Button("Export DNG"))
     {
-        std::cout << "Exporting at exposure: " << m_exposure << std::endl;
+        fmt::print("Exporting at exposure: {}\n", m_exposure);
     }
 
     ImGui::End();
@@ -173,7 +179,10 @@ void App::photoViewer()
     {
         auto result = m_loadFuture.get();
         if (result.has_value())
+        {
+            clearImage();
             m_image = uploadTexture(*result);
+        }
         m_loading = false;
     }
 
@@ -256,6 +265,16 @@ void App::photoViewer()
     }
 
     ImGui::End();
+}
+
+void App::clearImage()
+{
+    if (!m_image.has_value())
+        return;
+
+    GLuint textureId = static_cast<GLuint>(m_image->textureId);
+    glDeleteTextures(1, &textureId);
+    m_image.reset();
 }
 
 void App::renderDockSpace()

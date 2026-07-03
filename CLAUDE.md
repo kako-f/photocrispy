@@ -8,7 +8,7 @@ Dependencies are managed by vcpkg (manifest mode). Build output goes to `D:\Buil
 
 ```powershell
 # Configure (first time or after CMakeLists changes)
-cmake --preset default
+cmake --preset vcpkg
 
 # Build
 cmake --build D:\Build\PhotoCrispy

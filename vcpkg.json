@@ -1,7 +1,6 @@
 {
   "dependencies": [
     "fmt",
-    "glad",
     "glfw3",
     "libraw"
   ]
