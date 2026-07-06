@@ -23,7 +23,7 @@ ${IMGUI_DIR}/backends/imgui_impl_glfw.cpp
 )
 
 
-add_executable(photocrispy main.cpp App.cpp ImageLoader.cpp ${IMGUI_SOURCES} ${IMGUIDIALOG_DIR}/ImGuiFileDialog.cpp)
+add_executable(photocrispy main.cpp App.cpp ImageLoader.cpp StbImageDecoder.cpp ${IMGUI_SOURCES} ${IMGUIDIALOG_DIR}/ImGuiFileDialog.cpp)
 
 # 4. Include Headers
 # Where to look for #include "imgui.h"
@@ -53,10 +53,12 @@ add_test(NAME load_result_queue_tests COMMAND load_result_queue_tests)
 
 add_executable(image_loader_data_tests
     tests/ImageLoaderDataTests.cpp
+    StbImageDecoder.cpp
 )
 
 target_include_directories(image_loader_data_tests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
+    ${IMGUIDIALOG_DIR}
 )
 
 add_test(NAME image_loader_data_tests COMMAND image_loader_data_tests)

@@ -1,4 +1,5 @@
 #include "ImageLoader.h"
+#include "StbImageDecoder.h"
 
 #include <cassert>
 #include <cstdint>
@@ -33,9 +34,17 @@ static void fullDataUses16BitPixels()
     assert(image.pixels8.empty());
 }
 
+static void invalidJpegMemoryReturnsNoImage()
+{
+    const uint8_t invalid[] = { 0, 1, 2, 3 };
+    auto image = decodeJpegMemoryToRgb(invalid, sizeof(invalid), ImageKind::Preview);
+    assert(!image.has_value());
+}
+
 int main()
 {
     previewDataUses8BitPixels();
     fullDataUses16BitPixels();
+    invalidJpegMemoryReturnsNoImage();
     return 0;
 }
