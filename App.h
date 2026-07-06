@@ -31,7 +31,7 @@ private:
     GLFWwindow* m_window = nullptr;
     std::optional<RawImage> m_image;
     // m_loadFuture carries the result of the background decodeRawImage() call
-    std::future<std::optional<RawImageData>> m_loadFuture;
+    std::future<std::optional<ImageData>> m_loadFuture;
     // shows "Loading..." in photoViewer()
     bool m_loading = false;
 

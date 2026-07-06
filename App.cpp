@@ -17,7 +17,7 @@ bool App::init()
     if (!glfwInit())
         return false;
 
-    m_window = glfwCreateWindow(1280, 720, "RAW Processor Prototype", NULL, NULL);
+    m_window = glfwCreateWindow(1280, 720, "PhotoCrispy", NULL, NULL);
 
     if (!m_window)
         return false;
@@ -135,7 +135,7 @@ void App::renderMenuBar()
             m_lastDir = ImGuiFileDialog::Instance()->GetCurrentPath();
             ImGui::MarkIniSettingsDirty();
             // async call to decodeRawImage
-            m_loadFuture = std::async(std::launch::async, decodeRawImage, filePathName);
+            m_loadFuture = std::async(std::launch::async, decodeFullRawImage, filePathName);
             m_loading = true;
         }
 
@@ -150,6 +150,7 @@ void App::renderDevelopPanel()
     // Zoom controls below the canvas
     if (m_image.has_value())
     {
+        ImGui::SliderFloat("Zoom", &m_zoom, 0.5f, 8.0f);
         ImGui::Text("Zoom: %.0f%%", m_zoom * 100.0f);
         ImGui::SameLine();
         if (ImGui::SmallButton("Reset"))

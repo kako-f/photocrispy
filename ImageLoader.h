@@ -24,8 +24,6 @@ struct LoadResult {
     ImageData image;
 };
 
-using RawImageData = ImageData;
-
 struct RawImage
 {
     unsigned int textureId = 0;
@@ -34,6 +32,7 @@ struct RawImage
     ImageKind kind = ImageKind::Full;
 };
 
-std::optional<RawImageData> decodeRawImage(const std::string& path);
-RawImage uploadTexture(const RawImageData& data);
+std::optional<ImageData> decodeFullRawImage(const std::string& path);
+std::optional<ImageData> extractEmbeddedPreviewImage(const std::string& path);
+RawImage uploadTexture(const ImageData& data);
 
