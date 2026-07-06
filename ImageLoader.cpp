@@ -23,7 +23,10 @@ std::optional<RawImageData> decodeRawImage(const std::string& path)
     RawImageData result;
     result.width  = img->width;
     result.height = img->height;
-    result.pixels.assign(src, src + pixelCount);
+    result.channels = 3;
+    result.is16Bit = true;
+    result.kind = ImageKind::Full;
+    result.pixels16.assign(src, src + pixelCount);
 
     LibRaw::dcraw_clear_mem(img);
     return result;
@@ -37,7 +40,7 @@ RawImage uploadTexture(const RawImageData& data)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16, data.width, data.height,
-                 0, GL_RGB, GL_UNSIGNED_SHORT, data.pixels.data());
+                 0, GL_RGB, GL_UNSIGNED_SHORT, data.pixels16.data());
 
     return RawImage{ (unsigned int)texId, data.width, data.height };
 }

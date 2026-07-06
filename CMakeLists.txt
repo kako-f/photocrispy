@@ -41,12 +41,22 @@ target_link_libraries(photocrispy PRIVATE
 
 enable_testing()
 
-add_executable(photocrispy_tests
+add_executable(load_result_queue_tests
     tests/LoadResultQueueTests.cpp
 )
 
-target_include_directories(photocrispy_tests PRIVATE
+target_include_directories(load_result_queue_tests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
-add_test(NAME photocrispy_tests COMMAND photocrispy_tests)
+add_test(NAME load_result_queue_tests COMMAND load_result_queue_tests)
+
+add_executable(image_loader_data_tests
+    tests/ImageLoaderDataTests.cpp
+)
+
+target_include_directories(image_loader_data_tests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+)
+
+add_test(NAME image_loader_data_tests COMMAND image_loader_data_tests)
