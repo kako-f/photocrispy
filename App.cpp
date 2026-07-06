@@ -66,6 +66,9 @@ void App::run()
 
 void App::shutdown()
 {
+    if (m_loadFuture.valid())
+        m_loadFuture.wait();
+
     clearImage();
 
     // Destroying context and data freeing up memory
@@ -134,9 +137,19 @@ void App::renderMenuBar()
             std::string filePathName = ImGuiFileDialog::Instance()->GetFilePathName();
             m_lastDir = ImGuiFileDialog::Instance()->GetCurrentPath();
             ImGui::MarkIniSettingsDirty();
-            // async call to decodeRawImage
-            m_loadFuture = std::async(std::launch::async, decodeFullRawImage, filePathName);
+            const uint64_t generation = ++m_loadGeneration;
             m_loading = true;
+            m_showingPreview = false;
+
+            m_loadFuture = std::async(std::launch::async, [this, filePathName, generation]() {
+                if (auto preview = extractEmbeddedPreviewImage(filePathName)) {
+                    m_loadResults.push(LoadResult{ generation, std::move(*preview) });
+                }
+
+                if (auto full = decodeFullRawImage(filePathName)) {
+                    m_loadResults.push(LoadResult{ generation, std::move(*full) });
+                }
+            });
         }
 
         // close
@@ -174,33 +187,39 @@ void App::renderDevelopPanel()
 
 void App::photoViewer()
 {
-    // Poll the background decode — if ready, upload to GPU on the main thread
-    // ask if (1st) we are loading something,
-    if (m_loading && m_loadFuture.valid() && m_loadFuture.wait_for(std::chrono::seconds(0)) == std::future_status::ready)
-    {
-        auto result = m_loadFuture.get();
-        if (result.has_value())
-        {
-            clearImage();
-            m_image = uploadTexture(*result);
+    while (auto result = m_loadResults.tryPop()) {
+        if (result->generation != m_loadGeneration) {
+            continue;
         }
-        m_loading = false;
+
+        clearImage();
+        m_image = uploadTexture(result->image);
+        m_showingPreview = result->image.kind == ImageKind::Preview;
+
+        if (result->image.kind == ImageKind::Full) {
+            m_loading = false;
+            m_showingPreview = false;
+        }
+    }
+
+    if (m_loading && m_loadFuture.valid() &&
+        m_loadFuture.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+        m_loadFuture.get();
+        if (!m_showingPreview)
+            m_loading = false;
     }
 
     ImGui::Begin("Viewer");
 
     // As imgui is constantly rendering, we ask if m_image has value.
-    if (m_loading)
+    if (m_image.has_value())
     {
-        ImVec2 region = ImGui::GetContentRegionAvail();
-        float barW = region.x * 0.5f;
-        ImGui::SetCursorPos(ImVec2((region.x - barW) * 0.5f, region.y * 0.5f));
-        ImGui::ProgressBar(-1.0f * (float)ImGui::GetTime(), ImVec2(barW, 0.0f), "Loading...");
-    }
-    else if (m_image.has_value())
-    {
-
         ImVec2 canvasSize = ImGui::GetContentRegionAvail();
+
+        if (m_loading && m_showingPreview) {
+            ImGui::TextDisabled("Loading full RAW...");
+            canvasSize = ImGui::GetContentRegionAvail();
+        }
 
         // Compute fit-to-canvas size, then apply zoom
         float aspect = (float)m_image->width / (float)m_image->height;
@@ -259,6 +278,13 @@ void App::photoViewer()
         ImGui::Image((ImTextureID)(uintptr_t)m_image->textureId, ImVec2(w, h));
 
         ImGui::EndChild();
+    }
+    else if (m_loading)
+    {
+        ImVec2 region = ImGui::GetContentRegionAvail();
+        float barW = region.x * 0.5f;
+        ImGui::SetCursorPos(ImVec2((region.x - barW) * 0.5f, region.y * 0.5f));
+        ImGui::ProgressBar(-1.0f * (float)ImGui::GetTime(), ImVec2(barW, 0.0f), "Loading...");
     }
     else
     {

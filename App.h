@@ -1,9 +1,11 @@
 #pragma once
+#include <cstdint>
 #include <future>
 #include <optional>
 #include <string>
 #include <GLFW/glfw3.h>
 #include "ImageLoader.h"
+#include "LoadResultQueue.h"
 
 /*
 std::future provides a mechanism to access the result of asynchronous operations
@@ -30,10 +32,13 @@ private:
 
     GLFWwindow* m_window = nullptr;
     std::optional<RawImage> m_image;
-    // m_loadFuture carries the result of the background decodeRawImage() call
-    std::future<std::optional<ImageData>> m_loadFuture;
+    // Background loading emits preview and full images into this queue.
+    std::future<void> m_loadFuture;
+    LoadResultQueue<LoadResult> m_loadResults;
+    uint64_t m_loadGeneration = 0;
     // shows "Loading..." in photoViewer()
     bool m_loading = false;
+    bool m_showingPreview = false;
 
     // Adjustments
     float m_exposure = 0.0f;
