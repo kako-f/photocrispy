@@ -38,3 +38,15 @@ target_link_libraries(photocrispy PRIVATE
     glfw
     OpenGL::GL
 )
+
+enable_testing()
+
+add_executable(photocrispy_tests
+    tests/LoadResultQueueTests.cpp
+)
+
+target_include_directories(photocrispy_tests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+)
+
+add_test(NAME photocrispy_tests COMMAND photocrispy_tests)
