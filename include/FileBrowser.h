@@ -12,7 +12,7 @@ private:
 
 public:
     const fs::path& GetSelectedFile() const;
-    void Refresh(const std::filesystem::path &folder);
+    bool Refresh(const std::filesystem::path &folder);
     bool Draw();
 
 };

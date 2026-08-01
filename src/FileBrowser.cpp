@@ -2,6 +2,7 @@
 #include "imgui.h"
 #include <algorithm>
 #include <unordered_set>
+#include <utility>
 
 
 bool FileBrowser::IsSupportedImage(const fs::path &path) const {
@@ -14,15 +15,21 @@ bool FileBrowser::IsSupportedImage(const fs::path &path) const {
                  [](unsigned char c) { return std::tolower(c); });
   return extensions.find(ext) != extensions.end();
 }
-void FileBrowser::Refresh(const fs::path &folder) {
-  files.clear();
+bool FileBrowser::Refresh(const fs::path &folder) {
+  std::error_code error;
+  std::vector<fs::path> refreshedFiles;
 
-  for (const auto &entry : fs::directory_iterator(folder)) {
-
-    if (entry.is_regular_file() && IsSupportedImage(entry.path())) {
-      files.push_back(entry.path());
-    }
+  for (fs::directory_iterator it(folder, error), end;
+       !error && it != end; it.increment(error)) {
+    if (it->is_regular_file(error) && IsSupportedImage(it->path()))
+      refreshedFiles.push_back(it->path());
   }
+
+  if (error)
+    return false;
+
+  files = std::move(refreshedFiles);
+  return true;
 }
 const fs::path &FileBrowser::GetSelectedFile() const { return selectedFile; }
 

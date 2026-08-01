@@ -121,8 +121,7 @@ void App::openNewFile(const fs::path &path) {
   const std::string filePathName = path.string();
   const fs::path directory = path.parent_path();
 
-  if (directory != m_filmstripDir) {
-    browser.Refresh(directory);
+  if (directory != m_filmstripDir && browser.Refresh(directory)) {
     m_filmstripDir = directory;
   }
 

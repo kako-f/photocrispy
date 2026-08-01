@@ -76,3 +76,19 @@ target_include_directories(image_loader_data_tests PRIVATE
 )
 
 add_test(NAME image_loader_data_tests COMMAND image_loader_data_tests)
+
+add_executable(file_browser_tests
+    tests/FileBrowserTests.cpp
+    src/FileBrowser.cpp
+    ${IMGUI_DIR}/imgui.cpp
+    ${IMGUI_DIR}/imgui_draw.cpp
+    ${IMGUI_DIR}/imgui_widgets.cpp
+    ${IMGUI_DIR}/imgui_tables.cpp
+)
+
+target_include_directories(file_browser_tests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${IMGUI_DIR}
+)
+
+add_test(NAME file_browser_tests COMMAND file_browser_tests)
