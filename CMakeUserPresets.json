@@ -1,12 +1,3 @@
 {
-  "version": 8,
-  "configurePresets": [
-    {
-      "name": "default",
-      "inherits": "vcpkg",
-      "environment": {
-        "VCPKG_ROOT": "<path to vcpkg>"
-      }
-    }
-  ]
+  "version": 9
 }

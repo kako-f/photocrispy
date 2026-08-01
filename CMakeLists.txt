@@ -10,6 +10,7 @@ find_package(fmt CONFIG REQUIRED)
 find_package(glfw3 REQUIRED)
 find_package(OpenGL REQUIRED)
 find_package(libraw CONFIG REQUIRED)
+find_package(glad CONFIG REQUIRED)
 
 # Define Source Files
 # Core logic and the specific backends for GLFW and OpenGL
@@ -48,6 +49,7 @@ target_link_libraries(photocrispy PRIVATE
     fmt::fmt
     glfw
     OpenGL::GL
+    glad::glad
 )
 
 # Testing

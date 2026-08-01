@@ -1,12 +1,18 @@
 # Preview-First RAW Loading Implementation Plan
 
+**Status:** Tasks 1-5 are implemented in the current tree. The Debian build and
+automated tests pass. Task 6 manual RAW verification and Windows verification
+remain.
+The unchecked boxes below preserve the original execution workflow; this status
+line is the current implementation record.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Show an embedded RAW preview quickly, then replace it with the full 16-bit RAW decode when ready.
 
-**Architecture:** Add format-aware image data, a small thread-safe result queue, and one background load job that emits preview and full results tagged with generation IDs. `App` polls results on the main thread and remains the only place that creates or deletes OpenGL textures.
+**Architecture:** Add format-aware image data, thread-safe result/completion queues, and background load jobs that emit preview and full results tagged with generation IDs. `App` keeps outstanding futures until they complete, polls results on the main thread, and remains the only place that creates or deletes OpenGL textures.
 
-**Tech Stack:** C++17, LibRaw, OpenGL/GLFW, ImGui, stb_image through a project-owned wrapper, CMake/vcpkg/MSVC.
+**Tech Stack:** C++17, LibRaw, OpenGL/GLFW, ImGui, stb_image through a project-owned wrapper, CMake/vcpkg, GCC on Debian, and MSVC on Windows.
 
 ---
 
@@ -17,18 +23,47 @@
 - `StbImageDecoder.h`: Declares a tiny JPEG memory decoder wrapper.
 - `StbImageDecoder.cpp`: Defines `STB_IMAGE_IMPLEMENTATION` once and calls the vendored `stb_image.h` without modifying `external/`.
 - `LoadResultQueue.h`: Header-only thread-safe FIFO queue for background loader results.
-- `App.h`: Replaces the single final-result future with queue, generation, and background job state.
+- `App.h`: Replaces the single final-result future with load future storage, result/completion queues, generation, and background job state.
 - `App.cpp`: Starts preview-first load jobs, polls queue results, discards stale generations, and updates the viewer status.
 - `tests/LoadResultQueueTests.cpp`: Assert-based unit tests for FIFO and empty queue behavior.
 - `tests/ImageLoaderDataTests.cpp`: Assert-based unit tests for image data format helpers.
-- `CMakeLists.txt`: Adds new source files and a lightweight `photocrispy_tests` executable.
+- `CMakeLists.txt`: Adds new source files and lightweight assert-based test executables.
 
-Build verification must be run from a Visual Studio Developer Command Prompt, not a regular PowerShell where `cmake` is unavailable:
+## Current Implementation Notes
+
+The implemented app uses `std::vector<std::future<void>> m_loadFutures`, not a
+single `std::future`. This was added after manual verification showed that
+opening file B while file A was still decoding could briefly hang the UI. The
+root cause was assigning over a still-running `std::future` from
+`std::async(std::launch::async, ...)`, which can block until the previous job
+finishes.
+
+The app also uses two queues:
+
+- `LoadResultQueue<LoadResult> m_loadResults` for preview/full image payloads.
+- `LoadResultQueue<uint64_t> m_completedLoads` for generation completion.
+
+`photoViewer()` polls both queues and prunes completed futures each frame.
+Texture creation and deletion remain on the main thread.
+
+Tests are split into `load_result_queue_tests` and `image_loader_data_tests`
+instead of one combined executable, because the simple assert-based test files
+each define their own `main()`.
+
+Build verification uses the matching platform preset:
+
+```sh
+cmake --preset linux
+cmake --build --preset linux
+ctest --preset linux
+```
+
+On Windows, use a Visual Studio Developer Command Prompt:
 
 ```powershell
-cmake --preset vcpkg
-cmake --build D:\Build\PhotoCrispy
-ctest --test-dir D:\Build\PhotoCrispy -C Debug --output-on-failure
+cmake --preset windows
+cmake --build --preset windows
+ctest --preset windows
 ```
 
 ---
@@ -90,15 +125,15 @@ Modify `CMakeLists.txt` so the test is part of the build before the queue exists
 ```cmake
 enable_testing()
 
-add_executable(photocrispy_tests
+add_executable(load_result_queue_tests
     tests/LoadResultQueueTests.cpp
 )
 
-target_include_directories(photocrispy_tests PRIVATE
+target_include_directories(load_result_queue_tests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
-add_test(NAME photocrispy_tests COMMAND photocrispy_tests)
+add_test(NAME load_result_queue_tests COMMAND load_result_queue_tests)
 ```
 
 - [ ] **Step 2: Run the test to verify it fails**
@@ -160,7 +195,7 @@ cmake --build D:\Build\PhotoCrispy
 ctest --test-dir D:\Build\PhotoCrispy -C Debug --output-on-failure
 ```
 
-Expected: `photocrispy_tests` passes.
+Expected: `load_result_queue_tests` passes.
 
 - [ ] **Step 5: Commit**
 
@@ -226,7 +261,8 @@ int main()
 }
 ```
 
-Add the file to `photocrispy_tests` in `CMakeLists.txt`.
+Add the file to a separate `image_loader_data_tests` executable in
+`CMakeLists.txt`.
 
 - [ ] **Step 2: Run the test to verify it fails**
 
@@ -288,7 +324,7 @@ cmake --build D:\Build\PhotoCrispy
 ctest --test-dir D:\Build\PhotoCrispy -C Debug --output-on-failure
 ```
 
-Expected: tests pass.
+Expected: `load_result_queue_tests` and `image_loader_data_tests` pass.
 
 - [ ] **Step 5: Commit**
 
@@ -397,7 +433,9 @@ std::optional<ImageData> decodeJpegMemoryToRgb(const uint8_t* data, size_t size,
 }
 ```
 
-Add `StbImageDecoder.cpp` to both `photocrispy` and `photocrispy_tests`, and add `${IMGUIDIALOG_DIR}` to the test include directories so `"stb/stb_image.h"` resolves.
+Add `StbImageDecoder.cpp` to both `photocrispy` and `image_loader_data_tests`,
+and add `${IMGUIDIALOG_DIR}` to the test include directories so
+`"stb/stb_image.h"` resolves.
 
 - [ ] **Step 4: Run the test to verify it passes**
 
@@ -569,15 +607,16 @@ Modify `App.h` includes:
 Replace:
 
 ```cpp
-std::future<std::optional<RawImageData>> m_loadFuture;
+std::future<std::optional<ImageData>> m_loadFuture;
 bool m_loading = false;
 ```
 
 With:
 
 ```cpp
-std::future<void> m_loadFuture;
+std::vector<std::future<void>> m_loadFutures;
 LoadResultQueue<LoadResult> m_loadResults;
+LoadResultQueue<uint64_t> m_completedLoads;
 uint64_t m_loadGeneration = 0;
 bool m_loading = false;
 bool m_showingPreview = false;
@@ -592,7 +631,7 @@ const uint64_t generation = ++m_loadGeneration;
 m_loading = true;
 m_showingPreview = false;
 
-m_loadFuture = std::async(std::launch::async, [this, filePathName, generation]() {
+m_loadFutures.push_back(std::async(std::launch::async, [this, filePathName, generation]() {
     if (auto preview = extractEmbeddedPreviewImage(filePathName)) {
         m_loadResults.push(LoadResult{ generation, std::move(*preview) });
     }
@@ -600,8 +639,14 @@ m_loadFuture = std::async(std::launch::async, [this, filePathName, generation]()
     if (auto full = decodeFullRawImage(filePathName)) {
         m_loadResults.push(LoadResult{ generation, std::move(*full) });
     }
-});
+
+    m_completedLoads.push(generation);
+}));
 ```
+
+Keep every returned future in `m_loadFutures`. Do not overwrite a single
+`std::future`; replacing a still-running async future can block the UI thread
+while the old LibRaw decode finishes.
 
 - [ ] **Step 3: Poll queued results in `photoViewer()`**
 
@@ -622,10 +667,17 @@ while (auto result = m_loadResults.tryPop()) {
     }
 }
 
-if (m_loading && m_loadFuture.valid() &&
-    m_loadFuture.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
-    m_loadFuture.get();
-    if (!m_showingPreview)
+for (auto it = m_loadFutures.begin(); it != m_loadFutures.end();) {
+    if (it->valid() && it->wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+        it->get();
+        it = m_loadFutures.erase(it);
+    } else {
+        ++it;
+    }
+}
+
+while (auto completedGeneration = m_completedLoads.tryPop()) {
+    if (*completedGeneration == m_loadGeneration)
         m_loading = false;
 }
 ```
@@ -653,7 +705,18 @@ else
 
 This keeps the old image visible until the preview or full image arrives, and keeps the preview visible while full decode continues.
 
-- [ ] **Step 5: Build**
+- [ ] **Step 5: Wait for outstanding loaders during shutdown**
+
+In `shutdown()`, wait for all valid futures before destroying app state:
+
+```cpp
+for (auto& future : m_loadFutures) {
+    if (future.valid())
+        future.wait();
+}
+```
+
+- [ ] **Step 6: Build**
 
 Run:
 
@@ -664,7 +727,7 @@ ctest --test-dir D:\Build\PhotoCrispy -C Debug --output-on-failure
 
 Expected: app and tests build.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ```powershell
 git add App.h App.cpp
@@ -710,6 +773,8 @@ Open file A, then quickly open file B before A finishes.
 
 Expected:
 - Results from file A do not replace file B after B starts loading.
+- Opening file B does not make the UI hang while file A continues decoding in
+  the background.
 
 - [ ] **Step 5: Commit any verification fixes**
 

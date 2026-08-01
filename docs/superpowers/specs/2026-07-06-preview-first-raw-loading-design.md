@@ -1,5 +1,8 @@
 # Preview-First RAW Loading Design
 
+**Status:** Implemented. The Debian build and automated tests pass; Windows and
+manual RAW-file verification are still required.
+
 ## Goal
 
 Improve perceived RAW file loading speed by showing an embedded preview as soon
@@ -11,32 +14,36 @@ and tone mapping work.
 
 ## Current State
 
-`App` starts one `std::future<std::optional<RawImageData>>` when the user opens a
-file. The worker calls `decodeRawImage()`, which runs LibRaw `open_file()`,
-`unpack()`, `dcraw_process()`, and `dcraw_make_mem_image()`. The UI shows a
-spinner until the future resolves, then uploads one `GL_RGB16` texture on the
-main thread.
-
-This keeps the UI responsive but gives no visual feedback until full CPU RAW
-processing completes.
+`App` starts a background job for each opened file and retains all outstanding
+futures. Each worker attempts embedded-preview extraction, performs the full
+LibRaw decode, and emits generation-tagged results. The main thread uploads the
+accepted result and replaces the preview with the full 16-bit texture.
 
 ## Architecture
 
-Replace the single final-result future with one background load job that can
-emit multiple results:
+The implementation uses background load jobs that can emit
+multiple results:
 
 1. Try to extract an embedded preview with LibRaw thumbnail APIs.
 2. Push a preview image result if extraction succeeds.
 3. Continue the full RAW decode using the existing LibRaw path.
 4. Push a full-resolution image result when complete.
+5. Push the completed generation after preview and full attempts finish.
 
-`App` owns a small thread-safe queue of pending load results. `photoViewer()`
-polls that queue each frame, discards stale generations, and uploads accepted
-images to OpenGL textures on the main thread.
+`App` owns a thread-safe queue of pending load results and a second queue of
+completed load generations. `photoViewer()` polls those queues each frame,
+discards stale generations, and uploads accepted images to OpenGL textures on
+the main thread.
+
+`App` keeps outstanding `std::future<void>` values in `m_loadFutures` and prunes
+completed futures from the UI loop. This avoids a UI stall when opening file B
+while file A is still decoding. Overwriting a single running `std::future`
+created by `std::async(std::launch::async, ...)` can block until the previous
+job completes.
 
 ## Data Model
 
-Add an image kind and format-aware payload:
+The image kind and format-aware payload are:
 
 ```cpp
 enum class ImageKind {
@@ -66,7 +73,9 @@ Preview images are expected to be 8-bit RGB or RGBA. Full RAW images remain
 ## Loading Behavior
 
 Opening a file increments `m_loadGeneration`, sets loading state, and starts a
-background job that captures the file path and generation.
+background job that captures the file path and generation. The future for that
+job is appended to `m_loadFutures`; it is not assigned over an older running
+future.
 
 The job attempts embedded preview extraction first. If that fails, it silently
 continues to full decode. Missing previews must not prevent the file from
@@ -81,9 +90,13 @@ Generation IDs prevent stale background results from replacing a newer image:
 if the user opens file B while file A is still decoding, later results from file
 A are discarded by the main thread.
 
+Completed-generation messages stop the loading state for the current generation
+when both preview and full attempts have finished, including the case where a
+preview was shown but full decode failed.
+
 ## Texture Upload
 
-Texture upload becomes format-aware:
+Texture upload is format-aware:
 
 ```text
 8-bit RGB preview  -> GL_RGB8,  GL_RGB,  GL_UNSIGNED_BYTE
@@ -135,12 +148,24 @@ Manual verification requires RAW files with and without embedded previews:
   load the full image.
 - Opening a second RAW before the first finishes should never show the first
   image after the second open starts.
+- Opening a second RAW before the first finishes should not make the UI hang
+  while the first full decode continues.
 
-Build verification must be run from a Visual Studio Developer Command Prompt so
-MSVC, CMake, and vcpkg are on `PATH`:
+Build verification uses the platform presets. `VCPKG_ROOT` must point to the
+vcpkg installation.
 
-```powershell
-cmake --preset vcpkg
-cmake --build D:\Build\PhotoCrispy
+Debian:
+
+```sh
+cmake --preset linux
+cmake --build --preset linux
+ctest --preset linux
 ```
 
+Windows (from a Visual Studio Developer Command Prompt so MSVC is on `PATH`):
+
+```powershell
+cmake --preset windows
+cmake --build --preset windows
+ctest --preset windows
+```

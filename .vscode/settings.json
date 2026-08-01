@@ -1,0 +1,5 @@
+{
+    "clangd.arguments": [
+        "--compile-commands-dir=/media/data/PhotoCrispy-build/linux"
+    ]
+}
