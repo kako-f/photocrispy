@@ -119,8 +119,14 @@ void App::registerSettingsHandler() {
 void App::openNewFile(const fs::path &path) {
   // Function to open File. Async. Push to queue
   const std::string filePathName = path.string();
+  const fs::path directory = path.parent_path();
 
-  m_lastDir = path.parent_path().string();
+  if (directory != m_filmstripDir) {
+    browser.Refresh(directory);
+    m_filmstripDir = directory;
+  }
+
+  m_lastDir = directory.string();
   ImGui::MarkIniSettingsDirty();
   const uint64_t generation = ++m_loadGeneration;
   m_loading = true;
@@ -336,7 +342,6 @@ void App::filmStrip() {
   const fs::path &files = browser.GetSelectedFile();
 
   if (m_lastDir != ".") {
-    browser.Refresh(m_lastDir);
     bool sel = browser.Draw();
 
     if (sel) {

@@ -24,6 +24,7 @@ public:
 
 private:
   std::string m_lastDir = ".";
+  fs::path m_filmstripDir;
   void renderUI();
   void renderMenuBar();
   void renderDevelopPanel();
