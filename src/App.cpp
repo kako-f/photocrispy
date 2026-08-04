@@ -27,6 +27,9 @@ bool App::init() {
     return false;
 
   glfwMakeContextCurrent(m_window);
+  if (!gladLoadGLLoader(reinterpret_cast<GLADloadproc>(glfwGetProcAddress)))
+    return false;
+
   glfwSwapInterval(1); // Enable vsync
 
   IMGUI_CHECKVERSION();
@@ -40,6 +43,10 @@ bool App::init() {
 
   ImGui_ImplGlfw_InitForOpenGL(m_window, true);
   ImGui_ImplOpenGL3_Init("#version 430");
+
+  // Triangle
+  newTriangle.createTriangle();
+  newTriangle.createFramebuffer();
 
   return true;
 }
@@ -73,7 +80,7 @@ void App::shutdown() {
   }
 
   clearImage();
-
+  newTriangle.destroy();
   // Destroying context and data freeing up memory
   ImGui_ImplOpenGL3_Shutdown();
   ImGui_ImplGlfw_Shutdown();
@@ -144,6 +151,7 @@ void App::openNewFile(const fs::path &path) {
 }
 
 void App::drawAboutWindow() {}
+
 void App::renderMenuBar() {
   if (ImGui::BeginMainMenuBar()) {
     if (ImGui::BeginMenu("File")) {
@@ -180,6 +188,16 @@ void App::renderMenuBar() {
                          "C++, OpenGL, Dear ImGui and LibRaw.");
 
       ImGui::Spacing();
+      // Triangle in about. Opengl test
+      ImVec2 triangleSize = ImGui::GetContentRegionAvail();
+      triangleSize.y -= ImGui::GetFrameHeightWithSpacing();
+
+      if (triangleSize.x > 0.0f && triangleSize.y > 0.0f) {
+        newTriangle.renderTriangle(static_cast<int>(triangleSize.x),
+                                   static_cast<int>(triangleSize.y));
+        ImGui::Image(static_cast<ImTextureID>(newTriangle.texture()),
+                     triangleSize, ImVec2(0.0f, 1.0f), ImVec2(1.0f, 0.0f));
+      }
 
       if (ImGui::Button("Close", ImVec2(100.0f, 0.0f))) {
         m_showAboutWindow = false;

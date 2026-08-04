@@ -2,6 +2,7 @@
 #include "FileBrowser.h"
 #include "ImageLoader.h"
 #include "LoadResultQueue.h"
+#include "graphics/triangleRenderer.h"
 #include <GLFW/glfw3.h>
 #include <cstdint>
 #include <future>
@@ -47,6 +48,9 @@ private:
   LoadResultQueue<LoadResult> m_loadResults;
   LoadResultQueue<uint64_t> m_completedLoads;
   uint64_t m_loadGeneration = 0;
+
+  // renderer
+  TriangleRenderer newTriangle;
   // shows "Loading..." in photoViewer()
   bool m_loading = false;
   bool m_showingPreview = false;

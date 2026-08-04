@@ -32,6 +32,8 @@ add_executable(photocrispy
     src/ImageLoader.cpp
     src/StbImageDecoder.cpp
     src/FileBrowser.cpp
+    src/shaderProgram.cpp
+    src/triangleRenderer.cpp
     ${IMGUI_SOURCES}
     ${IMGUIDIALOG_DIR}/ImGuiFileDialog.cpp
 )
@@ -43,6 +45,9 @@ target_include_directories(photocrispy PRIVATE
     ${IMGUI_DIR}
     ${IMGUI_DIR}/backends
     ${IMGUIDIALOG_DIR}
+)
+target_compile_definitions(photocrispy PRIVATE
+    PHOTOCRISPY_SHADER_DIR="${CMAKE_CURRENT_SOURCE_DIR}/shaders"
 )
 target_link_libraries(photocrispy PRIVATE
     libraw::raw

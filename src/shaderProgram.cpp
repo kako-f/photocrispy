@@ -6,8 +6,8 @@
 #include <sstream>
 #include <string>
 
-ShaderProgram::ShaderProgram(std::string vertexSource,
-                             std::string fragmentSource) {
+void ShaderProgram::create_shader(std::string vertexSource,
+                                  std::string fragmentSource) {
   // 1. retrieve the vertex/fragment source code from filePath
   std::string vertexCode;
   std::string fragmentCode;

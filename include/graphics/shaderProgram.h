@@ -10,8 +10,7 @@
 class ShaderProgram {
 public:
   unsigned int ID;
-  ShaderProgram(std::string vertexSource, std::string fragmentSource);
-  ~ShaderProgram();
+  void create_shader(std::string vertexSource, std::string fragmentSource);
 
   /*   ShaderProgram(const ShaderProgram &) = delete;
     ShaderProgram &operator=(const ShaderProgram &) = delete;
