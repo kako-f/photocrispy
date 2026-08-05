@@ -9,19 +9,10 @@
 
 class ShaderProgram {
 public:
-  unsigned int ID;
+  unsigned int ID = 0;
   void create_shader(std::string vertexSource, std::string fragmentSource);
 
-  /*   ShaderProgram(const ShaderProgram &) = delete;
-    ShaderProgram &operator=(const ShaderProgram &) = delete;
-    ShaderProgram(ShaderProgram &&other) noexcept;
-    ShaderProgram &operator=(ShaderProgram &&other) noexcept; */
-
   void use();
-
-  /*   [[nodiscard]] GLuint id() const noexcept;
-    [[nodiscard]] GLint uniformLocation(std::string name) const;
-   */
   void setFloat(const std::string &name, float value) const;
 
 private:

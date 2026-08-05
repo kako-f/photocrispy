@@ -2,6 +2,7 @@
 #include "FileBrowser.h"
 #include "ImageLoader.h"
 #include "LoadResultQueue.h"
+#include "graphics/shaderProgram.h"
 #include "graphics/triangleRenderer.h"
 #include <GLFW/glfw3.h>
 #include <cstdint>
@@ -37,10 +38,24 @@ private:
   void registerSettingsHandler();
   void clearImage();
 
+  bool initImageProcessing();
+  void resizeProcessedImage(int width, int height);
+  void processImage();
+  void destroyImageProcessing();
+
   void openNewFile(const fs::path &path);
 
   GLFWwindow *m_window = nullptr;
   std::optional<RawImage> m_image;
+  // editing the image
+  ShaderProgram m_imageProcessingShader;
+  GLuint m_processingVao = 0;
+  GLuint m_processingFramebuffer = 0;
+  GLuint m_processedTexture = 0;
+  int m_processedWidth = 0;
+  int m_processedHeight = 0;
+  bool m_processingReady = false;
+  bool m_processingDirty = false;
   // FileBrowser
   FileBrowser browser;
   // Background loading emits preview and full images into this queue.

@@ -1,5 +1,7 @@
 #pragma once
 #include "graphics/shaderProgram.h"
+#include <GLFW/glfw3.h>
+#include <cmath>
 #include <glad/glad.h>
 
 class TriangleRenderer {

@@ -2,6 +2,7 @@
 #include "ImGuiFileDialog.h"
 #include "ImageLoader.h"
 #include "fmt/core.h"
+#include "graphics/shaderProgram.h"
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
@@ -48,7 +49,122 @@ bool App::init() {
   newTriangle.createTriangle();
   newTriangle.createFramebuffer();
 
+  // image processing start
+  m_processingReady = initImageProcessing();
+
   return true;
+}
+
+bool App::initImageProcessing() {
+
+  m_imageProcessingShader.create_shader(
+      PHOTOCRISPY_SHADER_DIR "/imageProcessing.vert",
+      PHOTOCRISPY_SHADER_DIR "/imageProcessing.frag");
+
+  GLint linked = false;
+  glGetProgramiv(m_imageProcessingShader.ID, GL_LINK_STATUS, &linked);
+  // checking status of the program
+  if (linked != GL_TRUE) {
+    glDeleteProgram(m_imageProcessingShader.ID);
+    m_imageProcessingShader.ID = 0;
+    return false;
+  }
+  glGenVertexArrays(1, &m_processingVao);
+  glGenFramebuffers(1, &m_processingFramebuffer);
+  glGenTextures(1, &m_processedTexture);
+
+  glBindTexture(GL_TEXTURE_2D, m_processedTexture);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+  glBindFramebuffer(GL_FRAMEBUFFER, m_processingFramebuffer);
+  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
+                         m_processedTexture, 0);
+  // use the shader
+  m_imageProcessingShader.use();
+  glUniform1i(glGetUniformLocation(m_imageProcessingShader.ID, "sourceImage"),
+              0);
+  glBindTexture(GL_TEXTURE_2D, 0);
+  glBindFramebuffer(GL_FRAMEBUFFER, 0);
+  glUseProgram(0);
+
+  return true;
+}
+
+void App::resizeProcessedImage(int width, int height) {
+  // onlye when image dimensions changes
+  // TODO = NECESARRY?
+  if (!m_processingReady || width <= 0 || height <= 0)
+    return;
+
+  if (width == m_processedWidth && height == m_processedHeight)
+    return;
+
+  glBindTexture(GL_TEXTURE_2D, m_processedTexture);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA,
+               GL_UNSIGNED_BYTE, nullptr);
+  glBindFramebuffer(GL_FRAMEBUFFER, m_processingFramebuffer);
+  const GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+  glBindFramebuffer(GL_FRAMEBUFFER, 0);
+  glBindTexture(GL_TEXTURE_2D, 0);
+
+  if (status != GL_FRAMEBUFFER_COMPLETE) {
+    fmt::print(stderr, "Image processing framebuffer incomplete: {:#x}\n",
+               status);
+    m_processingReady = false;
+    return;
+  }
+
+  m_processedWidth = width;
+  m_processedHeight = height;
+}
+
+void App::processImage() {
+  if (!m_processingReady || !m_processingDirty || !m_image.has_value())
+    return;
+  if (m_processedWidth != m_image->width ||
+      m_processedHeight != m_image->height)
+    return;
+
+  glBindFramebuffer(GL_FRAMEBUFFER, m_processingFramebuffer);
+  glViewport(0, 0, m_processedWidth, m_processedHeight);
+
+  m_imageProcessingShader.use();
+  glActiveTexture(GL_TEXTURE0);
+  glBindTexture(GL_TEXTURE_2D, m_image->textureId);
+  glUniform1f(glGetUniformLocation(m_imageProcessingShader.ID, "exposure"),
+              m_exposure);
+  glUniform3fv(glGetUniformLocation(m_imageProcessingShader.ID, "whiteBalance"),
+               1, m_color);
+
+  glBindVertexArray(m_processingVao);
+  glDrawArrays(GL_TRIANGLES, 0, 3);
+
+  glBindVertexArray(0);
+  glBindTexture(GL_TEXTURE_2D, 0);
+  glBindFramebuffer(GL_FRAMEBUFFER, 0);
+  glUseProgram(0);
+
+  m_processingDirty = false;
+}
+
+void App::destroyImageProcessing() {
+  if (m_imageProcessingShader.ID != 0)
+    glDeleteProgram(m_imageProcessingShader.ID);
+  if (m_processedTexture != 0)
+    glDeleteTextures(1, &m_processedTexture);
+  if (m_processingFramebuffer != 0)
+    glDeleteFramebuffers(1, &m_processingFramebuffer);
+  if (m_processingVao != 0)
+    glDeleteVertexArrays(1, &m_processingVao);
+
+  m_imageProcessingShader.ID = 0;
+  m_processedTexture = 0;
+  m_processingFramebuffer = 0;
+  m_processingVao = 0;
+  m_processingReady = false;
 }
 
 void App::run() {
@@ -80,7 +196,9 @@ void App::shutdown() {
   }
 
   clearImage();
+  destroyImageProcessing();
   newTriangle.destroy();
+
   // Destroying context and data freeing up memory
   ImGui_ImplOpenGL3_Shutdown();
   ImGui_ImplGlfw_Shutdown();
@@ -233,8 +351,22 @@ void App::renderDevelopPanel() {
   ImGui::End();
   ImGui::Begin("Develop Settings");
   ImGui::Text("Basic Adjustments");
-  ImGui::SliderFloat("Exposure", &m_exposure, -5.0f, 5.0f);
-  ImGui::ColorEdit3("White Balance Tint", m_color);
+  bool adjustmentsChanged = false;
+  adjustmentsChanged |=
+      ImGui::SliderFloat("Exposure", &m_exposure, -5.0f, 5.0f);
+  adjustmentsChanged |=
+      ImGui::SliderFloat3("White Balance RGB", m_color, 0.0f, 2.0f);
+
+  if (ImGui::Button("Reset Adjustments")) {
+    m_exposure = 0.0f;
+    m_color[0] = 1.0f;
+    m_color[1] = 1.0f;
+    m_color[2] = 1.0f;
+    adjustmentsChanged = true;
+  }
+
+  if (adjustmentsChanged)
+    m_processingDirty = true;
 
   if (ImGui::Button("Export DNG")) {
     fmt::print("Exporting at exposure: {}\n", m_exposure);
@@ -251,6 +383,10 @@ void App::photoViewer() {
 
     clearImage();
     m_image = uploadTexture(result->image);
+    // editing part
+    resizeProcessedImage(m_image->width, m_image->height);
+    m_processingDirty = true;
+
     m_showingPreview = result->image.kind == ImageKind::Preview;
 
     if (result->image.kind == ImageKind::Full) {
@@ -275,7 +411,7 @@ void App::photoViewer() {
   }
 
   ImGui::Begin("Viewer");
-
+  processImage();
   // As imgui is constantly rendering, we ask if m_image has value.
   if (m_image.has_value()) {
     ImVec2 canvasSize = ImGui::GetContentRegionAvail();
@@ -338,7 +474,11 @@ void App::photoViewer() {
 
     ImGui::SetCursorPos(ImVec2(offsetX, offsetY));
 
-    ImGui::Image((ImTextureID)(uintptr_t)m_image->textureId, ImVec2(w, h));
+    // ImGui::Image((ImTextureID)(uintptr_t)m_image->textureId, ImVec2(w, h));
+    ImGui::Image((ImTextureID)(uintptr_t)(m_processingReady
+                                              ? m_processedTexture
+                                              : m_image->textureId),
+                 ImVec2(w, h));
 
     ImGui::EndChild();
   } else if (m_loading) {

@@ -2,11 +2,25 @@
 #include "../include/graphics/triangleRenderer.h"
 
 void TriangleRenderer::createTriangle() {
-  appShaders.create_shader(PHOTOCRISPY_SHADER_DIR "/vertexTriangle.glsl",
-                           PHOTOCRISPY_SHADER_DIR "/fragmentTriangle.glsl");
+  appShaders.create_shader(PHOTOCRISPY_SHADER_DIR "/vertexTriangle.vert",
+                           PHOTOCRISPY_SHADER_DIR "/fragmentTriangle.frag");
   // set up vertex data (and buffer(s)) and configure vertex attributes
   // ------------------------------------------------------------------
-  const float vertices[] = {0.0f, 0.7f, -0.7f, -0.7f, 0.7f, -0.7f};
+  // const float vertices[] = {0.0f, 0.7f, -0.7f, -0.7f, 0.7f, -0.7f};
+
+  /*   const float vertices[] = {
+        0.5f,  -0.5f, 0.0f, // bottom right
+        -0.5f, -0.5f, 0.0f, // bottom left
+        0.0f,  0.5f,  0.0f  // top
+    }; */
+
+  float vertices[] = {
+      // positions         // colors
+      0.5f,  -0.5f, 0.0f, 1.0f, 0.0f, 0.0f, // bottom right
+      -0.5f, -0.5f, 0.0f, 0.0f, 1.0f, 0.0f, // bottom left
+      0.0f,  0.5f,  0.0f, 0.0f, 0.0f, 1.0f  // top
+
+  };
 
   glGenVertexArrays(1, &VAO);
   glBindVertexArray(VAO);
@@ -15,7 +29,21 @@ void TriangleRenderer::createTriangle() {
   glBindBuffer(GL_ARRAY_BUFFER, VBO);
   glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
-  glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), nullptr);
+  // glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float),
+  // nullptr);
+  //
+  // declaration of the points of the figure
+  // glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void
+  // *)0);
+
+  // position attribute
+  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void *)0);
+  glEnableVertexAttribArray(0);
+  // color attribute
+  glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float),
+                        (void *)(3 * sizeof(float)));
+  glEnableVertexAttribArray(1);
+
   glEnableVertexAttribArray(0);
 
   glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -46,20 +74,26 @@ void TriangleRenderer::renderTriangle(int newWidth, int newHeight) {
     glBindTexture(GL_TEXTURE_2D, texture_id);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA,
                  GL_UNSIGNED_BYTE, nullptr);
-    glBindTexture(GL_TEXTURE_2D, 0);
-
-    glBindFramebuffer(GL_FRAMEBUFFER, FBO);
-    glViewport(0, 0, width, height);
-    glClearColor(0.08f, 0.08f, 0.10f, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT);
-
-    appShaders.use();
-    glBindVertexArray(VAO);
-    glDrawArrays(GL_TRIANGLES, 0, 3);
-    glBindVertexArray(0);
-
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
   }
+  glBindTexture(GL_TEXTURE_2D, 0);
+
+  glBindFramebuffer(GL_FRAMEBUFFER, FBO);
+  glViewport(0, 0, width, height);
+  glClearColor(0.08f, 0.08f, 0.10f, 1.0f);
+  glClear(GL_COLOR_BUFFER_BIT);
+
+  appShaders.use();
+
+  /*   double timeValue = glfwGetTime();
+    float greenValue = static_cast<float>(sin(timeValue) / 2.0 + 0.5);
+    int vertexColorLocation = glGetUniformLocation(appShaders.ID, "ourColor");
+    glUniform4f(vertexColorLocation, 0.0f, greenValue, 0.0f, 1.0f); */
+
+  glBindVertexArray(VAO);
+  glDrawArrays(GL_TRIANGLES, 0, 3);
+  glBindVertexArray(0);
+
+  glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
 void TriangleRenderer::destroy() {
